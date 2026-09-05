@@ -1,0 +1,62 @@
+{
+  "expo": {
+    "name": "Course Arena",
+    "slug": "course-arena",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/logo.png",
+    "scheme": "coursearena",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": false,
+    "splash": {
+      "image": "./assets/images/logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
+    },
+    "notification": {
+      "icon": "./assets/images/logo.png",
+      "color": "#4338B8"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.coursearena.app",
+      "usesAppleSignIn": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/logo.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "package": "com.coursearena.app",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Course Arena needs access to your photos to upload course images."
+        }
+      ],
+      "expo-web-browser"
+    ],
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "bae13f9d-c90d-43b8-b980-5bca5728e6eb"
+      }
+    },
+    "owner": "xorax990"
+  }
+}
