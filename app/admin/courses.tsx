@@ -16,6 +16,8 @@ import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Course, Category } from "@/types";
 import { listCategories, togglePinCourseInCategory } from "@/services/courses";
+import { CourseThumbnail } from "@/components/CourseThumbnail";
+import { normalizeImageUrl } from "@/utils/imageUrl";
 
 export default function AdminCourses() {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -32,7 +34,16 @@ export default function AdminCourses() {
         listCategories(),
       ]);
 
-      setCourses(courseSnap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })));
+      setCourses(
+        courseSnap.docs.map((d) => {
+          const data = d.data() as any;
+          return {
+            id: d.id,
+            ...data,
+            image: normalizeImageUrl(data.image) || data.image || null,
+          };
+        })
+      );
       setCategories(cats);
     } catch (e: any) {
       Alert.alert("Error", e.message || "Failed to load courses");
@@ -212,6 +223,12 @@ export default function AdminCourses() {
               return (
                 <View style={[styles.card, isPinned && styles.cardPinned]}>
                   <View style={styles.cardTopRow}>
+                    <CourseThumbnail
+                      uri={item.image}
+                      title={item.title}
+                      style={styles.cardThumbnail}
+                      resizeMode="cover"
+                    />
                     <View style={{ flex: 1 }}>
                       <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                         <Text style={styles.cardTitle} numberOfLines={1}>
@@ -395,8 +412,13 @@ const styles = StyleSheet.create({
   },
   cardTopRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+  },
+  cardThumbnail: {
+    width: 54,
+    height: 54,
+    borderRadius: 10,
+    marginRight: 12,
   },
   cardTitle: {
     color: "#fff",

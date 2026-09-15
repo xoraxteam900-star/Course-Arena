@@ -27,6 +27,7 @@ import { collection, query, orderBy, limit, getDocs, where, onSnapshot } from "f
 import { db } from "@/firebase/config";
 import { FadeInView } from "@/components/FadeInView";
 import { CommunityPollCard } from "@/components/CommunityPollCard";
+import { CourseThumbnail } from "@/components/CourseThumbnail";
 import { Poll, listenToActivePolls } from "@/services/polls";
 import * as WebBrowser from "expo-web-browser";
 import * as Clipboard from "@/utils/clipboard";
@@ -101,16 +102,12 @@ const CategoryCourseSlider = ({ courses, savedIds, handleToggleSave, colors, ind
         const content = (
           <>
             <View style={styles.cardImageContainer}>
-              {item.image ? (
-                <Image 
-                  source={{ uri: item.image }} 
-                  style={[styles.cardImage, { height: imgH, borderRadius: imgRadius }]} 
-                />
-              ) : (
-                <View 
-                  style={[styles.cardImage, { backgroundColor: colors.border, height: imgH, borderRadius: imgRadius }]} 
-                />
-              )}
+              <CourseThumbnail
+                uri={item.image}
+                title={item.title}
+                style={[styles.cardImage, { height: imgH, borderRadius: imgRadius }]}
+                resizeMode="cover"
+              />
               {item.isPinned ? (
                 <View style={[styles.popularBadge, { backgroundColor: "rgba(251, 191, 36, 0.95)", borderColor: "#F59E0B" }]}>
                   <Text style={{ fontSize: 11 }}>📌</Text>

@@ -22,6 +22,7 @@ import { myPurchases, mySavedCourses, getCourse, listCategories, toggleSaveCours
 import { getMyAccessLink } from "@/services/wallet";
 import { Course, Category } from "@/types";
 import { FadeInView } from "@/components/FadeInView";
+import { CourseThumbnail } from "@/components/CourseThumbnail";
 import { useNavBarVisibility } from "@/contexts/NavBarVisibilityContext";
 
 // Helper to assign icons to categories matching the design
@@ -372,13 +373,12 @@ export default function MyCourses() {
                   >
                     {/* Course Thumbnail */}
                     <View style={styles.continueThumbWrapper}>
-                      {course.image ? (
-                        <Image source={{ uri: course.image }} style={styles.continueThumb} />
-                      ) : (
-                        <View style={[styles.continueThumb, { backgroundColor: "#1E293B", justifyContent: "center", alignItems: "center" }]}>
-                          <Ionicons name="play-circle-outline" size={32} color="#6366F1" />
-                        </View>
-                      )}
+                      <CourseThumbnail
+                        uri={course.image}
+                        title={course.title}
+                        style={styles.continueThumb}
+                        resizeMode="cover"
+                      />
                     </View>
 
                     {/* Course Info & Actions (NO PROGRESS BAR AS REQUESTED) */}
@@ -546,13 +546,12 @@ export default function MyCourses() {
                     >
                       {/* Thumbnail Image */}
                       <View style={styles.gridThumbContainer}>
-                        {course.image ? (
-                          <Image source={{ uri: course.image }} style={styles.gridThumb} />
-                        ) : (
-                          <View style={[styles.gridThumb, { backgroundColor: "#1E293B", justifyContent: "center", alignItems: "center" }]}>
-                            <Ionicons name="book-outline" size={28} color="#6366F1" />
-                          </View>
-                        )}
+                        <CourseThumbnail
+                          uri={course.image}
+                          title={course.title}
+                          style={styles.gridThumb}
+                          resizeMode="cover"
+                        />
                       </View>
 
                       {/* Title & Metadata (NO PROGRESS BAR) */}

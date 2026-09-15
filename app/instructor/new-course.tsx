@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { listCategories } from "@/services/courses";
 import { Category } from "@/types";
 import { ThumbnailPicker } from "@/components/ThumbnailPicker";
+import { normalizeImageUrl } from "@/utils/imageUrl";
 import { Ionicons } from "@expo/vector-icons";
 
 export default function NewCourse() {
@@ -60,11 +61,11 @@ export default function NewCourse() {
     }
     setBusy(true);
     try {
-      let finalImageUrl = imageUrlInput.trim();
+      let finalImageUrl = normalizeImageUrl(imageUrlInput.trim());
 
       if (!finalImageUrl) {
         setBusy(false);
-        return Alert.alert("Missing Image URL", "Please upload an image using the web tool and paste the URL here.");
+        return Alert.alert("Missing Image URL", "Please upload an image or paste an image URL.");
       }
 
       const courseRef = await addDoc(collection(db, "courses"), {

@@ -12,6 +12,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/firebase/config";
 import { Category, Course } from "@/types";
+import { normalizeImageUrl } from "@/utils/imageUrl";
 
 export async function listCategories(): Promise<Category[]> {
   const snap = await getDocs(collection(db, "categories"));
@@ -34,7 +35,14 @@ export async function listPublishedCourses(opts?: {
     fbLimit(opts?.max ?? 50)
   );
   const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
+  return snap.docs.map((d) => {
+    const data = d.data() as any;
+    return {
+      id: d.id,
+      ...data,
+      image: normalizeImageUrl(data.image) || data.image || null,
+    };
+  });
 }
 
 // Powers the Netflix-style home screen: one row per category, each with
@@ -98,7 +106,12 @@ export async function togglePinCourseInCategory(categoryId: string, courseId: st
 export async function getCourse(courseId: string): Promise<Course | null> {
   const snap = await getDoc(doc(db, "courses", courseId));
   if (!snap.exists()) return null;
-  return { id: snap.id, ...(snap.data() as any) };
+  const data = snap.data() as any;
+  return {
+    id: snap.id,
+    ...data,
+    image: normalizeImageUrl(data.image) || data.image || null,
+  };
 }
 
 export async function recordCourseView(courseId: string, userId: string) {

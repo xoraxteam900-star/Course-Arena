@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Clipboard from "@/utils/clipboard";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import { CourseThumbnail } from "@/components/CourseThumbnail";
 import { getCourse, myPurchases, recordCourseView, listCategories } from "@/services/courses";
 import { toggleLike, toggleSave, addComment, listComments, submitReview, fileReport, editComment, deleteComment } from "@/services/social";
 import { purchaseCourse, getMyAccessLink } from "@/services/wallet";
@@ -299,13 +300,12 @@ export default function CourseDetail() {
           <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
             {/* HERO COURSE IMAGE BANNER */}
             <View style={[styles.heroContainer, { borderColor: borderCol }]}>
-              {course.image ? (
-                <Image source={{ uri: course.image }} style={styles.heroImage} resizeMode="cover" />
-              ) : (
-                <View style={[styles.heroPlaceholder, { backgroundColor: isDark ? "#1E293B" : "#EEF2F6" }]}>
-                  <Ionicons name="play-circle-outline" size={60} color="#6366F1" />
-                </View>
-              )}
+              <CourseThumbnail
+                uri={course.image}
+                title={course.title}
+                style={styles.heroImage}
+                resizeMode="cover"
+              />
             </View>
 
             {/* TAGS ROW */}
@@ -577,11 +577,12 @@ export default function CourseDetail() {
             <Text style={[styles.modalTitle, { color: textColor }]}>Confirm Purchase</Text>
 
             <View style={[styles.modalCourseCard, { backgroundColor: isDark ? "#0B0F19" : "#F1F5F9", borderColor: borderCol }]}>
-              {course.image ? (
-                <Image source={{ uri: course.image }} style={styles.modalCourseImg} />
-              ) : (
-                <View style={[styles.modalCourseImg, { backgroundColor: isDark ? "#334155" : "#E2E8F0" }]} />
-              )}
+              <CourseThumbnail
+                uri={course.image}
+                title={course.title}
+                style={styles.modalCourseImg}
+                resizeMode="cover"
+              />
               <Text style={[styles.modalCourseTitle, { color: textColor }]} numberOfLines={2}>
                 {course.title}
               </Text>
@@ -628,11 +629,12 @@ export default function CourseDetail() {
             <Text style={[styles.modalSubtitle, { color: textDimColor }]}>You are now enrolled in this course.</Text>
 
             <View style={[styles.modalCourseCardGreen, { backgroundColor: "rgba(16, 185, 129, 0.1)", borderColor: "#10B981" }]}>
-              {course.image ? (
-                <Image source={{ uri: course.image }} style={styles.modalCourseImg} />
-              ) : (
-                <View style={[styles.modalCourseImg, { backgroundColor: isDark ? "#334155" : "#E2E8F0" }]} />
-              )}
+              <CourseThumbnail
+                uri={course.image}
+                title={course.title}
+                style={styles.modalCourseImg}
+                resizeMode="cover"
+              />
               <View style={{ flex: 1 }}>
                 <Text style={[styles.modalCourseTitle, { color: textColor }]} numberOfLines={2}>
                   {course.title}

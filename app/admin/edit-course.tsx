@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { listCategories } from "@/services/courses";
 import { Category } from "@/types";
 import { ThumbnailPicker } from "@/components/ThumbnailPicker";
+import { normalizeImageUrl } from "@/utils/imageUrl";
 
 export default function AdminEditCourse() {
   const { profile } = useAuth();
@@ -51,7 +52,7 @@ export default function AdminEditCourse() {
     }
     setBusy(true);
     try {
-      let finalImageUrl = imageUrlInput.trim() || existingImage;
+      let finalImageUrl = normalizeImageUrl(imageUrlInput.trim()) || existingImage;
 
       await updateDoc(doc(db, "courses", courseId), {
         title: title.trim(),

@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { listCategories } from "@/services/courses";
 import { Category } from "@/types";
 import { ThumbnailPicker } from "@/components/ThumbnailPicker";
+import { normalizeImageUrl } from "@/utils/imageUrl";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -86,11 +87,11 @@ export default function AdminNewCourse() {
     }
     setBusy(true);
     try {
-      let finalImageUrl = imageUrlInput.trim();
+      let finalImageUrl = normalizeImageUrl(imageUrlInput.trim());
 
       if (!finalImageUrl) {
         setBusy(false);
-        return Alert.alert("Missing Image URL", "Please upload an image using the web tool and paste the URL here.");
+        return Alert.alert("Missing Image URL", "Please upload an image or paste an image URL.");
       }
 
       // Admin-authored courses go live immediately - no review queue,

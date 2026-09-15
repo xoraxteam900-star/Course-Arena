@@ -23,7 +23,10 @@
       "bundleIdentifier": "com.coursearena.app",
       "usesAppleSignIn": true,
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
       },
       "associatedDomains": [
         "applinks:coursearena.app"
@@ -31,6 +34,7 @@
     },
 
     "android": {
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/logo.png",
         "backgroundColor": "#080B14"
