@@ -92,10 +92,10 @@ const CategoryCourseSlider = ({ courses, savedIds, handleToggleSave, colors, ind
         }, 100);
       }}
       renderItem={({ item, index: itemIdx }) => {
-        const cardW = boxConfig?.cardWidth ?? 200;
-        const imgH = boxConfig?.imageHeight ?? 100;
+        const cardW = boxConfig?.cardWidth ? Math.max(boxConfig.cardWidth, 240) : 240;
+        const imgH = boxConfig?.imageHeight ? Math.max(boxConfig.imageHeight, 130) : 130;
         const radius = boxConfig?.borderRadius ?? 16;
-        const imgRadius = Math.max(radius - 4, 6);
+        const imgRadius = Math.max(radius - 4, 8);
         const titleSize = boxConfig?.titleFontSize ?? 14;
         const priceSize = boxConfig?.priceFontSize ?? 13;
 
@@ -108,21 +108,16 @@ const CategoryCourseSlider = ({ courses, savedIds, handleToggleSave, colors, ind
                 style={[styles.cardImage, { height: imgH, borderRadius: imgRadius }]}
                 resizeMode="cover"
               />
-              {item.isPinned ? (
+              {item.isPinned && (
                 <View style={[styles.popularBadge, { backgroundColor: "rgba(251, 191, 36, 0.95)", borderColor: "#F59E0B" }]}>
                   <Text style={{ fontSize: 11 }}>📌</Text>
                   <Text style={[styles.popularBadgeText, { color: "#0F172A", fontWeight: "800" }]}>Pinned</Text>
                 </View>
-              ) : (
-                <View style={styles.popularBadge}>
-                  <Text style={{ fontSize: 12 }}>🔥</Text>
-                  <Text style={styles.popularBadgeText}>Popular</Text>
-                </View>
               )}
             </View>
             <Text 
-              style={[styles.cardTitle, { color: colors.text, fontSize: titleSize }]} 
-              numberOfLines={1}
+              style={[styles.cardTitle, { color: colors.text, fontSize: titleSize, minHeight: 38 }]} 
+              numberOfLines={2}
             >
               {item.title}
             </Text>
@@ -630,8 +625,10 @@ export default function Dashboard() {
       {visibleGroups.map(({ category, courses }, idx) => (
         <View key={`group-view-${category.id ?? idx}`} style={{ marginTop: 24 }}>
           <View style={styles.rowHeader}>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Text style={[styles.rowTitle, { color: colors.text }]}>Popular in {category.name}</Text>
+            <View style={{ flex: 1, flexDirection: "row", alignItems: "center", marginRight: 8 }}>
+              <Text style={[styles.rowTitle, { color: colors.text }]} numberOfLines={1}>
+                {category.name}
+              </Text>
             </View>
             <Pressable onPress={() => setActiveCategory(activeCategory ? null : category.id)} style={{ flexDirection: "row", alignItems: "center" }}>
               <Text style={[styles.seeAll, { color: colors.primary }]}>{activeCategory ? "Hide" : "See all ➔"}</Text>
@@ -727,11 +724,11 @@ const styles = StyleSheet.create({
   seeAll: { color: "#4338CA", fontWeight: "600", fontSize: 13 },
   
   card: { 
-    width: 200, backgroundColor: "#1E293B", borderRadius: 16, padding: 12, 
+    width: 240, backgroundColor: "#1E293B", borderRadius: 16, padding: 12, 
     borderWidth: 1, borderColor: "rgba(255,255,255,0.05)",
   },
   cardImageContainer: { position: "relative", marginBottom: 8 },
-  cardImage: { width: "100%", height: 100, borderRadius: 10 },
+  cardImage: { width: "100%", height: 130, borderRadius: 10 },
   cardImagePlaceholder: { backgroundColor: "#E2E8F0" },
   popularBadge: { position: "absolute", bottom: 8, left: 8, backgroundColor: "rgba(0,0,0,0.7)", flexDirection: "row", alignItems: "center", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10, gap: 4 },
   popularBadgeText: { color: "#FFFFFF", fontSize: 9, fontWeight: "600" },

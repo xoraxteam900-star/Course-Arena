@@ -25,8 +25,8 @@ export const COURSE_BOX_PRESETS: Record<Exclude<CourseBoxPreset, "custom">, Omit
   },
   standard: {
     preset: "standard",
-    cardWidth: 200,
-    imageHeight: 100,
+    cardWidth: 240,
+    imageHeight: 130,
     borderRadius: 16,
     titleFontSize: 14,
     priceFontSize: 13,
