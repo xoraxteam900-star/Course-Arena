@@ -24,7 +24,10 @@
       "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
-      }
+      },
+      "associatedDomains": [
+        "applinks:coursearena.app"
+      ]
     },
 
     "android": {
@@ -40,6 +43,21 @@
       "package": "com.coursearena.app",
       "permissions": [
         "android.permission.RECORD_AUDIO"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            { "scheme": "coursearena" },
+            { "scheme": "https", "host": "coursearena.app", "pathPrefix": "/course" },
+            { "scheme": "http", "host": "coursearena.app", "pathPrefix": "/course" }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
       ]
     },
 

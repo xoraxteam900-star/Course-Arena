@@ -27,9 +27,17 @@ service cloud.firestore {
       allow write: if isSignedIn();
     }
 
-    // ---- course_access ----
+    // ---- course_access: SECURE! Only verified purchasers, instructors, or admins can access ----
     match /course_access/{courseId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn() && (
+        exists(/databases/$(database)/documents/purchases/$(request.auth.uid + '_' + courseId)) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+        (exists(/databases/$(database)/documents/courses/$(courseId)) && get(/databases/$(database)/documents/courses/$(courseId)).data.creatorUserId == request.auth.uid)
+      );
+      allow write: if isSignedIn() && (
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+        (exists(/databases/$(database)/documents/courses/$(courseId)) && get(/databases/$(database)/documents/courses/$(courseId)).data.creatorUserId == request.auth.uid)
+      );
     }
 
     // ---- purchases ----

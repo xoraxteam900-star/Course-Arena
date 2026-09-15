@@ -1,9 +1,8 @@
 import { useState, useRef } from "react";
 import { useLocalSearchParams, router } from "expo-router";
-import { View, StyleSheet, Pressable, Text, ActivityIndicator, Linking } from "react-native";
-import * as WebBrowser from "expo-web-browser";
+import { View, StyleSheet, Pressable, Text, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { WebView } from "react-native-webview";
+import { WebView, WebViewNavigation } from "react-native-webview";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "@/contexts/ThemeContext";
 
@@ -13,6 +12,8 @@ export default function CourseViewer() {
   const webViewRef = useRef<WebView>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [canGoBack, setCanGoBack] = useState(false);
+  const [canGoForward, setCanGoForward] = useState(false);
 
   const rawUrl = Array.isArray(url) ? url[0] : url;
   if (!rawUrl) return null;
@@ -22,7 +23,7 @@ export default function CourseViewer() {
     ? decoded
     : `https://${decoded}`;
 
-  // Validate URL structure: must have a protocol and a hostname with at least one dot or localhost
+  // Validate URL structure
   let isValidUrl = false;
   try {
     const parsed = new URL(formattedUrl);
@@ -41,9 +42,32 @@ export default function CourseViewer() {
   const textDimColor = isDark ? "#94A3B8" : "#64748B";
   const borderCol = isDark ? "rgba(255,255,255,0.08)" : "#E2E8F0";
 
+  // Injected JavaScript to protect course links and force internal navigation:
+  // 1. Prevents long press context menu (saving images, copying links)
+  // 2. Forces target="_blank" to stay inside current WebView
+  const secureInjectedJs = `
+    (function() {
+      document.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+        return false;
+      }, false);
+
+      function forceSelfTarget() {
+        var links = document.querySelectorAll('a[target="_blank"]');
+        links.forEach(function(a) {
+          a.setAttribute('target', '_self');
+        });
+      }
+      forceSelfTarget();
+      var observer = new MutationObserver(forceSelfTarget);
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+    })();
+    true;
+  `;
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: bg }]}>
-      {/* HEADER (Hidden in Full Screen Mode) */}
+      {/* SECURE IN-APP HEADER (Hidden in Full Screen Mode) */}
       {!isFullScreen ? (
         <View style={[styles.header, { backgroundColor: cardBg, borderBottomColor: borderCol }]}>
           <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={8}>
@@ -51,23 +75,50 @@ export default function CourseViewer() {
             <Text style={[styles.backText, { color: textColor }]}>Close</Text>
           </Pressable>
 
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          {/* Secure Shield Badge */}
+          <View style={styles.secureBadge}>
+            <Ionicons name="shield-checkmark" size={14} color="#10B981" />
+            <Text style={styles.secureBadgeText}>Secure In-App Player</Text>
+          </View>
+
+          {/* In-app Navigation Controls (Back, Forward, Refresh, Fullscreen) */}
+          <View style={styles.controlRow}>
             <Pressable
-              onPress={() => setIsFullScreen(true)}
-              style={[styles.browserBtn, { backgroundColor: isDark ? "#1E293B" : "#EEF2F6" }]}
-              hitSlop={8}
+              onPress={() => canGoBack && webViewRef.current?.goBack()}
+              disabled={!canGoBack}
+              style={[styles.iconControlBtn, { opacity: canGoBack ? 1 : 0.35 }]}
+              hitSlop={6}
             >
-              <Ionicons name="expand-outline" size={17} color="#6366F1" />
-              <Text style={styles.browserText}>Full Screen</Text>
+              <Ionicons name="chevron-back" size={20} color={textColor} />
             </Pressable>
 
             <Pressable
-              onPress={() => WebBrowser.openBrowserAsync(formattedUrl).catch(() => {})}
-              style={[styles.browserBtn, { backgroundColor: isDark ? "#1E293B" : "#EEF2F6" }]}
+              onPress={() => canGoForward && webViewRef.current?.goForward()}
+              disabled={!canGoForward}
+              style={[styles.iconControlBtn, { opacity: canGoForward ? 1 : 0.35 }]}
+              hitSlop={6}
+            >
+              <Ionicons name="chevron-forward" size={20} color={textColor} />
+            </Pressable>
+
+            <Pressable
+              onPress={() => {
+                setLoadError(null);
+                webViewRef.current?.reload();
+              }}
+              style={styles.iconControlBtn}
+              hitSlop={6}
+            >
+              <Ionicons name="reload" size={18} color="#6366F1" />
+            </Pressable>
+
+            <Pressable
+              onPress={() => setIsFullScreen(true)}
+              style={[styles.fullscreenBtn, { backgroundColor: isDark ? "#1E293B" : "#EEF2F6" }]}
               hitSlop={8}
             >
-              <Ionicons name="open-outline" size={17} color="#6366F1" />
-              <Text style={styles.browserText}>Browser</Text>
+              <Ionicons name="expand-outline" size={16} color="#6366F1" />
+              <Text style={styles.fullscreenText}>Full</Text>
             </Pressable>
           </View>
         </View>
@@ -88,28 +139,17 @@ export default function CourseViewer() {
           <View style={styles.errorIconCircle}>
             <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
           </View>
-          <Text style={[styles.errorTitle, { color: textColor }]}>Invalid Course Link</Text>
+          <Text style={[styles.errorTitle, { color: textColor }]}>Invalid Course Content</Text>
           <Text style={[styles.errorSubtitle, { color: textDimColor }]}>
-            The access link for this course does not appear to be a complete web address.
+            The secure course link could not be verified. Please contact the instructor or support.
           </Text>
-          <View style={[styles.urlBox, { backgroundColor: cardBg, borderColor: borderCol }]}>
-            <Text style={[styles.urlText, { color: textColor }]} numberOfLines={2}>
-              {formattedUrl}
-            </Text>
-          </View>
           <View style={styles.btnRow}>
             <Pressable
               style={[styles.actionBtn, { backgroundColor: "#6366F1" }]}
-              onPress={() => WebBrowser.openBrowserAsync(formattedUrl).catch(() => {})}
-            >
-              <Ionicons name="open-outline" size={16} color="#FFFFFF" />
-              <Text style={styles.actionBtnText}>Try in Browser</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.actionBtnSecondary, { borderColor: borderCol }]}
               onPress={() => router.back()}
             >
-              <Text style={[styles.actionBtnSecondaryText, { color: textColor }]}>Go Back</Text>
+              <Ionicons name="arrow-back" size={16} color="#FFFFFF" />
+              <Text style={styles.actionBtnText}>Go Back</Text>
             </Pressable>
           </View>
         </View>
@@ -122,9 +162,16 @@ export default function CourseViewer() {
           domStorageEnabled={true}
           startInLoadingState={true}
           allowsFullscreenVideo={true}
+          allowsBackForwardNavigationGestures={true}
+          setSupportMultipleWindows={false}
+          injectedJavaScriptBeforeContentLoaded={secureInjectedJs}
+          onNavigationStateChange={(nav: WebViewNavigation) => {
+            setCanGoBack(nav.canGoBack);
+            setCanGoForward(nav.canGoForward);
+          }}
           onError={(syntheticEvent) => {
             const { nativeEvent } = syntheticEvent;
-            setLoadError(nativeEvent.description || "Failed to load page");
+            setLoadError(nativeEvent.description || "Failed to load course");
           }}
           onHttpError={(syntheticEvent) => {
             const { nativeEvent } = syntheticEvent;
@@ -137,48 +184,45 @@ export default function CourseViewer() {
             if (
               reqUrl.startsWith("http://") ||
               reqUrl.startsWith("https://") ||
-              reqUrl === "about:blank"
+              reqUrl.startsWith("about:") ||
+              reqUrl.startsWith("data:")
             ) {
               return true;
             }
-            Linking.canOpenURL(reqUrl).then((supported) => {
-              if (supported) {
-                Linking.openURL(reqUrl).catch(() => {});
-              }
-            }).catch(() => {});
             return false;
           }}
-          renderError={(errorDomain, errorCode, errorDesc) => (
+          renderError={() => (
             <View style={[styles.errorContainer, { backgroundColor: bg }]}>
               <View style={styles.errorIconCircle}>
                 <Ionicons name="cloud-offline-outline" size={48} color="#EF4444" />
               </View>
-              <Text style={[styles.errorTitle, { color: textColor }]}>Page Load Error</Text>
+              <Text style={[styles.errorTitle, { color: textColor }]}>Unable to Stream Course</Text>
               <Text style={[styles.errorSubtitle, { color: textDimColor }]}>
-                {errorCode === -1003
-                  ? "A server with the specified hostname could not be found. Please verify the course link or check your internet connection."
-                  : errorDesc || "Unable to resolve or connect to this web address."}
+                {loadError || "Could not establish a secure connection to the course materials. Please check your internet connection and try again."}
               </Text>
-              <View style={[styles.urlBox, { backgroundColor: cardBg, borderColor: borderCol }]}>
-                <Text style={[styles.urlText, { color: textColor }]} numberOfLines={2}>
-                  {formattedUrl}
+              <View style={[styles.securityNoticeBox, { backgroundColor: cardBg, borderColor: borderCol }]}>
+                <Ionicons name="lock-closed-outline" size={16} color="#10B981" />
+                <Text style={[styles.securityNoticeText, { color: textDimColor }]}>
+                  Course materials are encrypted & protected inside Course Arena
                 </Text>
               </View>
               <View style={styles.btnRow}>
                 <Pressable
                   style={[styles.actionBtn, { backgroundColor: "#6366F1" }]}
-                  onPress={() => webViewRef.current?.reload()}
+                  onPress={() => {
+                    setLoadError(null);
+                    webViewRef.current?.reload();
+                  }}
                 >
                   <Ionicons name="reload" size={16} color="#FFFFFF" />
-                  <Text style={styles.actionBtnText}>Retry</Text>
+                  <Text style={styles.actionBtnText}>Retry Loading</Text>
                 </Pressable>
                 <Pressable
                   style={[styles.actionBtnSecondary, { borderColor: borderCol }]}
-                  onPress={() => WebBrowser.openBrowserAsync(formattedUrl).catch(() => {})}
+                  onPress={() => router.back()}
                 >
-                  <Ionicons name="open-outline" size={16} color={textColor} />
                   <Text style={[styles.actionBtnSecondaryText, { color: textColor }]}>
-                    Open in Browser
+                    Go Back
                   </Text>
                 </Pressable>
               </View>
@@ -187,7 +231,9 @@ export default function CourseViewer() {
           renderLoading={() => (
             <View style={[styles.loadingContainer, { backgroundColor: bg }]}>
               <ActivityIndicator size="large" color="#6366F1" />
-              <Text style={[styles.loadingText, { color: textDimColor }]}>Loading course content...</Text>
+              <Text style={[styles.loadingText, { color: textDimColor }]}>
+                Decrypting and loading course...
+              </Text>
             </View>
           )}
         />
@@ -201,8 +247,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -211,24 +257,49 @@ const styles = StyleSheet.create({
   backBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 6,
   },
   backText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "600",
   },
-  browserBtn: {
+  secureBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(16, 185, 129, 0.12)",
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 20,
+  },
+  secureBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#10B981",
+  },
+  controlRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+  },
+  iconControlBtn: {
+    padding: 6,
     borderRadius: 8,
   },
-  browserText: {
+  fullscreenBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  fullscreenText: {
     color: "#6366F1",
-    fontSize: 14,
-    fontWeight: "600",
+    fontSize: 13,
+    fontWeight: "700",
   },
   loadingContainer: {
     ...StyleSheet.absoluteFill,
@@ -248,16 +319,16 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   errorIconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     backgroundColor: "rgba(239, 68, 68, 0.12)",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 16,
   },
   errorTitle: {
-    fontSize: 20,
+    fontSize: 19,
     fontWeight: "800",
     marginBottom: 8,
     textAlign: "center",
@@ -266,19 +337,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: "center",
     lineHeight: 20,
-    marginBottom: 16,
+    marginBottom: 20,
   },
-  urlBox: {
-    paddingHorizontal: 16,
+  securityNoticeBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 10,
     borderWidth: 1,
     width: "100%",
     marginBottom: 24,
   },
-  urlText: {
-    fontSize: 13,
-    textAlign: "center",
+  securityNoticeText: {
+    fontSize: 12,
+    flex: 1,
     fontWeight: "500",
   },
   btnRow: {
@@ -298,7 +372,7 @@ const styles = StyleSheet.create({
   actionBtnText: {
     color: "#FFFFFF",
     fontWeight: "700",
-    fontSize: 15,
+    fontSize: 14,
   },
   actionBtnSecondary: {
     flex: 1,
@@ -312,7 +386,7 @@ const styles = StyleSheet.create({
   },
   actionBtnSecondaryText: {
     fontWeight: "600",
-    fontSize: 15,
+    fontSize: 14,
   },
   floatingExitBtn: {
     position: "absolute",
