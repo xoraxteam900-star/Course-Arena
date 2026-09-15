@@ -1,34 +1,44 @@
 import { useState, useEffect } from "react";
-import { View, Text, TextInput, StyleSheet, Pressable, ScrollView, Alert, Image, KeyboardAvoidingView, Platform, Linking } from "react-native";
+import { View, Text, TextInput, StyleSheet, Pressable, ScrollView, Alert, KeyboardAvoidingView, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system";
-import { auth } from "@/firebase/config";
 import { addDoc, collection, serverTimestamp, doc, setDoc } from "firebase/firestore";
-import { router } from "expo-router";
-import { storage, db, app } from "@/firebase/config";
+import { router, useLocalSearchParams } from "expo-router";
+import { db } from "@/firebase/config";
 import { useAuth } from "@/contexts/AuthContext";
 import { listCategories } from "@/services/courses";
 import { Category } from "@/types";
+import { ThumbnailPicker } from "@/components/ThumbnailPicker";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function AdminNewCourse() {
   const { profile } = useAuth();
+  const params = useLocalSearchParams<{ prefillTitle?: string; prefillDescription?: string; prefillAccessLink?: string }>();
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoryId, setCategoryId] = useState("");
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
+  const [title, setTitle] = useState(params.prefillTitle || "");
+  const [description, setDescription] = useState(params.prefillDescription || "");
   const [price, setPrice] = useState("");
-  const [accessLink, setAccessLink] = useState("");
-  const [imageUri, setImageUri] = useState<string | null>(null);
-  const [imageBase64, setImageBase64] = useState<string | null>(null);
+  const [accessLink, setAccessLink] = useState(params.prefillAccessLink || "");
   const [imageUrlInput, setImageUrlInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [aiEnabled, setAiEnabled] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+
+  useEffect(() => {
+    if (params.prefillTitle && !title) setTitle(params.prefillTitle);
+    if (params.prefillDescription && !description) setDescription(params.prefillDescription);
+    if (params.prefillAccessLink && !accessLink) setAccessLink(params.prefillAccessLink);
+  }, [params]);
 
   useEffect(() => {
     listCategories().then((c) => {
       setCategories(c);
       if (c[0]) setCategoryId(c[0].id);
     });
+    AsyncStorage.getItem("@admin_ai_description_enabled")
+      .then(val => setAiEnabled(val === "true"))
+      .catch(() => {});
   }, []);
 
   if (profile?.role !== "admin") {
@@ -39,12 +49,30 @@ export default function AdminNewCourse() {
     );
   }
 
-  async function pickImage() {
-    const uploadUrl = process.env.EXPO_PUBLIC_IMAGE_UPLOAD_URL || "https://your-infinityfree-domain.com/upload.php";
-    Linking.openURL(uploadUrl).catch(() => {
-      Alert.alert("Error", "Could not open the browser. Please visit the upload URL manually.");
-    });
-  }
+  const generateDescription = async () => {
+    if (!title.trim()) {
+      return Alert.alert("Missing Title", "Please enter a course title first so the AI knows what to write about.");
+    }
+    setAiLoading(true);
+    try {
+      const q = `Write a compelling, professional 3-sentence description for a course titled: ${title}`;
+      const res = await fetch(`https://api-rebix.zone.id/api/claude-session?q=${encodeURIComponent(q)}`);
+      const text = await res.text();
+      let finalContent = text;
+      try {
+        const json = JSON.parse(text);
+        if (json.message) finalContent = json.message;
+        else if (json.result) finalContent = json.result;
+        else if (json.response) finalContent = json.response;
+        else if (typeof json === "string") finalContent = json;
+      } catch (e) {}
+      setDescription(finalContent);
+    } catch (e) {
+      Alert.alert("AI Error", "Failed to connect to the AI Assistant.");
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   async function onSubmit() {
     if (!title || !description || !price || !accessLink) {
@@ -52,6 +80,9 @@ export default function AdminNewCourse() {
     }
     if (!categoryId) {
       return Alert.alert("Missing Category", "Please select a category. If none exist, create one first.");
+    }
+    if (!profile) {
+      return Alert.alert("Not signed in", "Please sign in again and retry.");
     }
     setBusy(true);
     try {
@@ -110,18 +141,26 @@ export default function AdminNewCourse() {
       </Pressable>
       <Text style={styles.title}>Add a course</Text>
 
-      <Pressable style={styles.imagePicker} onPress={pickImage}>
-        <Text style={styles.imagePickerText}>🌐 Upload Thumbnail via Web</Text>
-        <Text style={{ color: "#64748B", fontSize: 11, marginTop: 4 }}>Opens your InfinityFree portal to upload safely</Text>
-      </Pressable>
-
-      <Text style={{color: "#64748B", textAlign: "center", marginBottom: 12, marginTop: -4}}>Paste the copied URL here:</Text>
-      <TextInput style={styles.input} placeholder="https://example.com/uploads/thumb..." placeholderTextColor="#94A3B8" value={imageUrlInput} onChangeText={setImageUrlInput} autoCapitalize="none" />
-
+      <ThumbnailPicker uid={profile.uid} value={imageUrlInput} onChange={setImageUrlInput} />
 
       <TextInput style={styles.input} placeholder="Course title" placeholderTextColor="#94A3B8" value={title} onChangeText={setTitle} />
+      
+      {aiEnabled && (
+        <View style={styles.aiGenRow}>
+          <Text style={{ color: "#94A3B8", fontSize: 13, flex: 1 }}>AI Auto-Description</Text>
+          <Pressable style={styles.aiGenBtn} onPress={generateDescription} disabled={aiLoading}>
+            {aiLoading ? <Text style={styles.aiGenBtnText}>Generating...</Text> : (
+              <>
+                <Ionicons name="sparkles" size={14} color="#fff" />
+                <Text style={styles.aiGenBtnText}>Generate</Text>
+              </>
+            )}
+          </Pressable>
+        </View>
+      )}
       <TextInput style={[styles.input, { height: 100 }]} placeholder="Description" placeholderTextColor="#94A3B8" multiline value={description} onChangeText={setDescription} />
       <TextInput style={styles.input} placeholder="Price (GH₵)" placeholderTextColor="#94A3B8" keyboardType="numeric" value={price} onChangeText={setPrice} />
+      
       <TextInput style={styles.input} placeholder="Access link (Drive, Telegram, etc.)" placeholderTextColor="#94A3B8" value={accessLink} onChangeText={setAccessLink} />
 
       <View style={styles.chipsRow}>
@@ -150,6 +189,9 @@ const styles = StyleSheet.create({
   imagePickerText: { color: "#94A3B8" },
   imagePreview: { width: "100%", height: "100%" },
   input: { backgroundColor: "#1E293B", color: "#fff", borderRadius: 12, padding: 14, marginBottom: 12 },
+  aiGenRow: { flexDirection: "row", alignItems: "center", marginBottom: 8, paddingHorizontal: 4 },
+  aiGenBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#6366F1", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 },
+  aiGenBtnText: { color: "#fff", fontSize: 12, fontWeight: "600" },
   chipsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 20 },
   chip: { paddingHorizontal: 14, paddingVertical: 8, backgroundColor: "#1E293B", borderRadius: 20 },
   chipActive: { backgroundColor: "#6366F1" },

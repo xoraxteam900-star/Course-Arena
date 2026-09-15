@@ -3,6 +3,7 @@ const purchase = require("./purchase");
 const paystack = require("./paystack");
 const courseApproval = require("./courseApproval");
 const loginMarket = require("./loginMarket");
+const otp = require("./otp");
 
 module.exports = {
   ...triggers,
@@ -10,4 +11,5 @@ module.exports = {
   ...paystack,
   ...courseApproval,
   ...loginMarket,
+  ...otp,
 };

@@ -1,15 +1,13 @@
 import { useState, useEffect } from "react";
-import { View, Text, TextInput, StyleSheet, Pressable, ScrollView, Alert, Image, KeyboardAvoidingView, Platform, Linking } from "react-native";
+import { View, Text, TextInput, StyleSheet, Pressable, ScrollView, Alert, KeyboardAvoidingView, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system";
-import { auth } from "@/firebase/config";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { router, useLocalSearchParams } from "expo-router";
-import { storage, db, app } from "@/firebase/config";
+import { db } from "@/firebase/config";
 import { useAuth } from "@/contexts/AuthContext";
 import { listCategories } from "@/services/courses";
 import { Category } from "@/types";
+import { ThumbnailPicker } from "@/components/ThumbnailPicker";
 
 export default function AdminEditCourse() {
   const { profile } = useAuth();
@@ -22,8 +20,6 @@ export default function AdminEditCourse() {
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
   const [accessLink, setAccessLink] = useState("");
-  const [imageUri, setImageUri] = useState<string | null>(null);
-  const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [existingImage, setExistingImage] = useState<string | null>(null);
   const [imageUrlInput, setImageUrlInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -48,13 +44,6 @@ export default function AdminEditCourse() {
       });
     }
   }, [courseId]);
-
-  async function pickImage() {
-    const uploadUrl = process.env.EXPO_PUBLIC_IMAGE_UPLOAD_URL || "https://your-infinityfree-domain.com/upload.php";
-    Linking.openURL(uploadUrl).catch(() => {
-      Alert.alert("Error", "Could not open the browser. Please visit the upload URL manually.");
-    });
-  }
 
   async function onSubmit() {
     if (!title || !description || !price || !accessLink || !categoryId) {
@@ -98,17 +87,7 @@ export default function AdminEditCourse() {
       
       <Text style={styles.title}>Edit Course</Text>
 
-      <Pressable style={styles.imagePicker} onPress={pickImage}>
-        {existingImage ? (
-          <Image source={{ uri: existingImage }} style={styles.imagePreview} />
-        ) : (
-          <Text style={styles.imagePickerText}>🌐 Upload Thumbnail via Web</Text>
-        )}
-      </Pressable>
-
-      <Text style={{color: "#64748B", textAlign: "center", marginBottom: 12, marginTop: -4}}>Paste the new image URL here:</Text>
-      <TextInput style={styles.input} placeholder="https://example.com/uploads/thumb..." placeholderTextColor="#94A3B8" value={imageUrlInput} onChangeText={setImageUrlInput} autoCapitalize="none" />
-
+      <ThumbnailPicker uid={profile?.uid || ""} value={imageUrlInput} onChange={setImageUrlInput} existingPreview={existingImage} />
 
       <TextInput style={styles.input} placeholder="Course title" placeholderTextColor="#94A3B8" value={title} onChangeText={setTitle} />
       <TextInput style={[styles.input, { height: 100 }]} placeholder="Description" placeholderTextColor="#94A3B8" multiline value={description} onChangeText={setDescription} />

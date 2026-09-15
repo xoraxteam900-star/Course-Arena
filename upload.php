@@ -2,19 +2,46 @@
 // Handle POST request for the upload
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json');
-    
+    // Allow the app (and any browser-based admin tooling) to call this
+    // cross-origin without being blocked.
+    header('Access-Control-Allow-Origin: *');
+    header('Access-Control-Allow-Methods: POST, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type');
+
     if (!isset($_FILES['thumbnail']) || $_FILES['thumbnail']['error'] !== UPLOAD_ERR_OK) {
         echo json_encode(['success' => false, 'message' => 'No file uploaded or upload error']);
         exit;
     }
 
     $file = $_FILES['thumbnail'];
-    $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
-    if (!in_array($file['type'], $allowedTypes)) {
-        echo json_encode(['success' => false, 'message' => 'Invalid file type. Only JPG, PNG, GIF, and WEBP are allowed.']);
+    // 8MB cap - InfinityFree free-tier accounts have limited storage/bandwidth,
+    // and this also blocks abuse of the endpoint for huge uploads.
+    $maxBytes = 8 * 1024 * 1024;
+    if ($file['size'] > $maxBytes) {
+        echo json_encode(['success' => false, 'message' => 'Image is too large. Max size is 8MB.']);
         exit;
     }
+
+    // IMPORTANT: never trust the client-supplied MIME type or filename
+    // extension to decide what gets saved - both are just strings the
+    // caller sends and can be spoofed (e.g. a ".php" file relabelled with
+    // a fake "image/jpeg" Content-Type and a ".jpg" name). getimagesize()
+    // actually reads the file's binary header, so this only accepts real
+    // image data, and we pick the saved extension ourselves from what it
+    // detects rather than anything the client claimed.
+    $imageInfo = @getimagesize($file['tmp_name']);
+    $allowedImageTypes = [
+        IMAGETYPE_JPEG => 'jpg',
+        IMAGETYPE_PNG  => 'png',
+        IMAGETYPE_GIF  => 'gif',
+        IMAGETYPE_WEBP => 'webp',
+    ];
+    if ($imageInfo === false || !isset($allowedImageTypes[$imageInfo[2]])) {
+        echo json_encode(['success' => false, 'message' => 'Invalid file. Only real JPG, PNG, GIF, and WEBP images are allowed.']);
+        exit;
+    }
+    $ext = $allowedImageTypes[$imageInfo[2]];
 
     // Ensure the uploads directory exists
     $uploadDir = __DIR__ . '/uploads/';
@@ -22,10 +49,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         mkdir($uploadDir, 0755, true);
     }
 
-    // Generate unique filename
-    $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
-    if (empty($ext)) $ext = 'jpg';
-    $filename = 'thumb_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+    // Defense in depth: even though we only ever write files with a safe,
+    // server-chosen image extension, make sure this directory can never
+    // execute a script if anything ever does end up in it.
+    $htaccessPath = $uploadDir . '.htaccess';
+    if (!file_exists($htaccessPath)) {
+        file_put_contents($htaccessPath, "php_flag engine off\nAddHandler cgi-script .php .php3 .php4 .php5 .php7 .phtml .pl .py .cgi\nOptions -ExecCGI\n");
+    }
+
+    // Server-generated filename only - never derived from the client's
+    // original filename, which closes off directory traversal / null-byte
+    // style tricks too.
+    $filename = 'thumb_' . time() . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
     $targetPath = $uploadDir . $filename;
 
     if (move_uploaded_file($file['tmp_name'], $targetPath)) {
@@ -33,13 +68,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $domain = $_SERVER['HTTP_HOST'];
         $path = dirname($_SERVER['REQUEST_URI']);
         if ($path === '/' || $path === '\\') $path = '';
-        
+
         $publicUrl = $protocol . '://' . $domain . $path . '/uploads/' . $filename;
-        
+
         echo json_encode(['success' => true, 'url' => $publicUrl]);
     } else {
         echo json_encode(['success' => false, 'message' => 'Failed to move uploaded file']);
     }
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    header('Access-Control-Allow-Origin: *');
+    header('Access-Control-Allow-Methods: POST, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type');
     exit;
 }
 ?>

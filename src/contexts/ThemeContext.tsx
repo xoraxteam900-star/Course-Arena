@@ -15,6 +15,7 @@ interface ThemeContextData {
     textDim: string;
     border: string;
     primary: string;
+    primaryText: string;
     navBar: string;
     navBorder: string;
     shadow: string;
@@ -28,6 +29,7 @@ const lightColors = {
   textDim: '#64748B',
   border: '#E2E8F0',
   primary: '#4338B8',
+  primaryText: '#FFFFFF',
   navBar: 'rgba(255, 255, 255, 0.85)',
   navBorder: 'rgba(0, 0, 0, 0.1)',
   shadow: '#000000',
@@ -40,6 +42,7 @@ const darkColors = {
   textDim: '#94A3B8',
   border: '#334155',
   primary: '#4338B8',
+  primaryText: '#FFFFFF',
   navBar: 'rgba(45, 45, 55, 0.68)',
   navBorder: 'rgba(255, 255, 255, 0.18)',
   shadow: '#FFFFFF',

@@ -1,8 +1,54 @@
+# Dependencies (never commit node_modules - install via npm install)
 node_modules/
-.expo/
-dist/
-.env
-scripts/serviceAccountKey.json
 functions/node_modules/
+package-lock.json.orig
+
+# Expo & Build output
+.expo/
+.expo-shared/
+dist/
+web-build/
+*.tsbuildinfo
+
+# Environment variables & API keys
+.env
+.env*
+.env.local
+.env.*.local
+!.env.example
+functions/.env
+functions/.env*
+functions/.env.*.local
+!functions/.env.example
+
+# Confidential credentials, service account keys & OTP storage
+*credentials*.json
+*serviceAccount*.json
+*service-account*.json
+*.pem
+*.key
+scripts/serviceAccountKey.json
+php_scripts/firebase_credentials.json
+php_scripts/otps.json
+php_scripts/secrets.php
+
+# Firebase local cache & debug
+.firebase/
+*-debug.log
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+
+# Logs, scratch files & OS metadata
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 .DS_Store
+Thumbs.db
+*.tmp
+*.bak
+scratch/
+test.txt
+app.json.save
+scratch.js

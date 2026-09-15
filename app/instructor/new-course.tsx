@@ -1,15 +1,14 @@
 import { useState, useEffect } from "react";
-import { View, Text, TextInput, StyleSheet, Pressable, ScrollView, Alert, Image, KeyboardAvoidingView, Platform, Linking } from "react-native";
+import { View, Text, TextInput, StyleSheet, Pressable, ScrollView, Alert, KeyboardAvoidingView, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system";
-import { auth } from "@/firebase/config";
 import { addDoc, collection, serverTimestamp, doc, setDoc } from "firebase/firestore";
 import { router } from "expo-router";
-import { storage, db, app } from "@/firebase/config";
+import { db } from "@/firebase/config";
 import { useAuth } from "@/contexts/AuthContext";
 import { listCategories } from "@/services/courses";
 import { Category } from "@/types";
+import { ThumbnailPicker } from "@/components/ThumbnailPicker";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function NewCourse() {
   const { profile } = useAuth();
@@ -19,8 +18,6 @@ export default function NewCourse() {
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
   const [accessLink, setAccessLink] = useState("");
-  const [imageUri, setImageUri] = useState<string | null>(null);
-  const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [imageUrlInput, setImageUrlInput] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -31,11 +28,24 @@ export default function NewCourse() {
     });
   }, []);
 
-  async function pickImage() {
-    const uploadUrl = process.env.EXPO_PUBLIC_IMAGE_UPLOAD_URL || "https://your-infinityfree-domain.com/upload.php";
-    Linking.openURL(uploadUrl).catch(() => {
-      Alert.alert("Error", "Could not open the browser. Please visit the upload URL manually.");
-    });
+  if (profile?.role !== "admin") {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: "#0F172A", justifyContent: "center", alignItems: "center", padding: 24 }}>
+        <Ionicons name="lock-closed-outline" size={56} color="#6366F1" style={{ marginBottom: 16 }} />
+        <Text style={{ color: "#FFFFFF", fontSize: 20, fontWeight: "800", textAlign: "center", marginBottom: 8 }}>
+          Submissions Closed
+        </Text>
+        <Text style={{ color: "#94A3B8", fontSize: 14, textAlign: "center", lineHeight: 20, marginBottom: 24 }}>
+          Course creation is currently restricted to platform administrators. Regular users cannot submit courses.
+        </Text>
+        <Pressable
+          style={{ backgroundColor: "#1769E0", paddingVertical: 12, paddingHorizontal: 24, borderRadius: 10 }}
+          onPress={() => router.back()}
+        >
+          <Text style={{ color: "#FFFFFF", fontWeight: "700" }}>Go Back</Text>
+        </Pressable>
+      </SafeAreaView>
+    );
   }
 
   async function onSubmit() {
@@ -44,6 +54,9 @@ export default function NewCourse() {
     }
     if (!categoryId) {
       return Alert.alert("Missing Category", "Please select a category.");
+    }
+    if (!profile) {
+      return Alert.alert("Not signed in", "Please sign in again and retry.");
     }
     setBusy(true);
     try {
@@ -102,14 +115,7 @@ export default function NewCourse() {
       </Pressable>
       <Text style={styles.title}>Submit a course</Text>
 
-      <Pressable style={styles.imagePicker} onPress={pickImage}>
-        <Text style={styles.imagePickerText}>🌐 Upload Thumbnail via Web</Text>
-        <Text style={{ color: "#64748B", fontSize: 11, marginTop: 4 }}>Opens your InfinityFree portal to upload safely</Text>
-      </Pressable>
-
-      <Text style={{color: "#64748B", textAlign: "center", marginBottom: 12, marginTop: -4}}>Paste the copied URL here:</Text>
-      <TextInput style={styles.input} placeholder="https://example.com/uploads/thumb..." placeholderTextColor="#94A3B8" value={imageUrlInput} onChangeText={setImageUrlInput} autoCapitalize="none" />
-
+      <ThumbnailPicker uid={profile?.uid || ""} value={imageUrlInput} onChange={setImageUrlInput} />
 
       <TextInput style={styles.input} placeholder="Course title" placeholderTextColor="#94A3B8" value={title} onChangeText={setTitle} />
       <TextInput style={[styles.input, { height: 100 }]} placeholder="Description" placeholderTextColor="#94A3B8" multiline value={description} onChangeText={setDescription} />

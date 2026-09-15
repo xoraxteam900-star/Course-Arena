@@ -10,6 +10,7 @@ import {
   doc,
   getDoc,
   serverTimestamp,
+  writeBatch,
 } from "firebase/firestore";
 import { db, auth } from "@/firebase/config";
 
@@ -131,4 +132,109 @@ export async function myTransactions(userId: string) {
     )
   );
   return snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
+}
+
+/**
+ * Look up a user profile by exact username
+ */
+export async function findUserByUsername(username: string) {
+  const clean = username.trim().toLowerCase().replace(/^@/, "");
+  if (!clean) return null;
+  const snap = await getDocs(
+    query(collection(db, "users"), where("username", "==", clean))
+  );
+  if (snap.empty) return null;
+  const d = snap.docs[0];
+  return { id: d.id, uid: d.id, ...(d.data() as any) };
+}
+
+/**
+ * Gift / Transfer wallet money to another user by username
+ */
+export async function giftMoneyToUser(receiverUsername: string, amount: number, note?: string) {
+  const senderUid = auth.currentUser?.uid;
+  if (!senderUid) throw new Error("Please sign in first.");
+
+  const recipient = await findUserByUsername(receiverUsername);
+  if (!recipient) {
+    throw new Error(`User @${receiverUsername.replace(/^@/, "")} was not found.`);
+  }
+
+  if (recipient.uid === senderUid) {
+    throw new Error("You cannot send money to yourself.");
+  }
+
+  if (amount <= 0) {
+    throw new Error("Please enter a valid gift amount.");
+  }
+
+  const senderRef = doc(db, "users", senderUid);
+  const receiverRef = doc(db, "users", recipient.uid);
+  const senderTxnRef = doc(collection(db, "transactions"));
+  const receiverTxnRef = doc(collection(db, "transactions"));
+
+  await runTransaction(db, async (tx) => {
+    const senderSnap = await tx.get(senderRef);
+    if (!senderSnap.exists()) throw new Error("Sender profile not found.");
+    const senderData = senderSnap.data();
+
+    const senderBal = Number(senderData?.balance || 0);
+    if (senderBal < amount) {
+      throw new Error(`Insufficient wallet balance. You have GH₵${senderBal.toFixed(2)}.`);
+    }
+
+    const receiverSnap = await tx.get(receiverRef);
+    if (!receiverSnap.exists()) throw new Error("Recipient profile not found.");
+    const receiverData = receiverSnap.data();
+    const receiverBal = Number(receiverData?.balance || 0);
+
+    const senderUsername = senderData?.username || "friend";
+    const cleanNote = note?.trim() ? ` - "${note.trim()}"` : "";
+
+    // Deduct sender
+    tx.update(senderRef, { balance: round2(senderBal - amount) });
+    // Credit receiver
+    tx.update(receiverRef, { balance: round2(receiverBal + amount) });
+
+    // Sender transaction
+    tx.set(senderTxnRef, {
+      userId: senderUid,
+      type: "gift_sent",
+      amount: -amount,
+      description: `Gift to @${recipient.username}${cleanNote}`,
+      status: "completed",
+      createdAt: serverTimestamp(),
+    });
+
+    // Receiver transaction
+    tx.set(receiverTxnRef, {
+      userId: recipient.uid,
+      type: "gift_received",
+      amount: amount,
+      description: `Gift from @${senderUsername}${cleanNote}`,
+      status: "completed",
+      createdAt: serverTimestamp(),
+    });
+  });
+
+  return { recipient, amount };
+}
+
+function round2(val: number): number {
+  return Math.round(val * 100) / 100;
+}
+
+/**
+ * Clear all transaction records for the current user
+ */
+export async function clearMyTransactions(userId: string): Promise<void> {
+  const snap = await getDocs(
+    query(collection(db, "transactions"), where("userId", "==", userId))
+  );
+
+  const batch = writeBatch(db);
+  snap.docs.forEach((d) => {
+    batch.delete(d.ref);
+  });
+  await batch.commit();
 }

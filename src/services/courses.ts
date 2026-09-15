@@ -38,18 +38,61 @@ export async function listPublishedCourses(opts?: {
 }
 
 // Powers the Netflix-style home screen: one row per category, each with
-// a handful of its most recent approved courses.
+// a handful of its most recent approved courses, with up to 3 pinned courses at the top.
 export async function coursesGroupedByCategory(perCategory = 6): Promise<
   { category: Category; courses: Course[] }[]
 > {
   const categories = await listCategories();
   const groups = await Promise.all(
     categories.map(async (category) => {
-      const courses = await listPublishedCourses({ categoryId: category.id, max: perCategory });
-      return { category, courses };
+      const courses = await listPublishedCourses({ categoryId: category.id, max: perCategory + 3 });
+      const pinnedIds = new Set(category.pinnedCourseIds || []);
+
+      // Sort pinned courses to the top
+      courses.sort((a, b) => {
+        const aPinned = pinnedIds.has(a.id);
+        const bPinned = pinnedIds.has(b.id);
+        if (aPinned && !bPinned) return -1;
+        if (!aPinned && bPinned) return 1;
+        return 0;
+      });
+
+      const enhancedCourses = courses.slice(0, perCategory).map((c) => ({
+        ...c,
+        isPinned: pinnedIds.has(c.id),
+      }));
+
+      return { category, courses: enhancedCourses };
     })
   );
   return groups.filter((g) => g.courses.length > 0);
+}
+
+/**
+ * Toggle pin status of a course within its category (max 3 pinned courses per category)
+ */
+export async function togglePinCourseInCategory(categoryId: string, courseId: string): Promise<boolean> {
+  const catRef = doc(db, "categories", categoryId);
+  const catSnap = await getDoc(catRef);
+  if (!catSnap.exists()) throw new Error("Category does not exist.");
+
+  const data = catSnap.data();
+  const currentPinned: string[] = data.pinnedCourseIds || [];
+
+  if (currentPinned.includes(courseId)) {
+    // Unpin
+    const updated = currentPinned.filter((id) => id !== courseId);
+    await updateDoc(catRef, { pinnedCourseIds: updated });
+    return false; // Now unpinned
+  } else {
+    // Pin: enforce maximum 3 pinned courses
+    if (currentPinned.length >= 3) {
+      throw new Error("You can only pin a maximum of 3 courses per category. Please unpin one first.");
+    }
+    const updated = [...currentPinned, courseId];
+    await updateDoc(catRef, { pinnedCourseIds: updated });
+    return true; // Now pinned
+  }
 }
 
 export async function getCourse(courseId: string): Promise<Course | null> {

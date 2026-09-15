@@ -7,11 +7,12 @@ import {
   sendPasswordResetEmail,
   sendEmailVerification,
   User,
-} from "@firebase/auth";
+} from "firebase/auth";
 import { doc, onSnapshot, setDoc, getDoc, serverTimestamp, collection, query, where, orderBy, limit } from "firebase/firestore";
 import { auth, db } from "@/firebase/config";
 import { UserProfile } from "@/types";
 import { Animated, View, Text, StyleSheet, Pressable } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 interface AuthContextValue {
   firebaseUser: User | null;
@@ -44,25 +45,83 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      setFirebaseUser(u);
-      if (!u) {
-        setProfile(null);
-        setLoading(false);
+    let isMounted = true;
+    let fallbackTimeout: any = null;
+    let unsubAuth: any = null;
+
+    async function initSession() {
+      let hasSavedSession = false;
+      try {
+        const saved = await AsyncStorage.getItem("@coursearena_user_session");
+        if (saved) {
+          hasSavedSession = true;
+        }
+      } catch {}
+
+      unsubAuth = onAuthStateChanged(auth, (u) => {
+        if (!isMounted) return;
+        if (fallbackTimeout) clearTimeout(fallbackTimeout);
+
+        if (u) {
+          setFirebaseUser(u);
+          AsyncStorage.setItem(
+            "@coursearena_user_session",
+            JSON.stringify({ uid: u.uid, email: u.email })
+          ).catch(() => {});
+        } else {
+          setFirebaseUser(null);
+          setProfile(null);
+          if (!hasSavedSession) {
+            setLoading(false);
+          }
+        }
+      });
+
+      if (auth.authStateReady) {
+        auth.authStateReady().then(() => {
+          if (!isMounted) return;
+          if (auth.currentUser) {
+            setFirebaseUser(auth.currentUser);
+          } else if (!hasSavedSession) {
+            setLoading(false);
+          }
+        }).catch(() => {
+          if (!hasSavedSession && isMounted) setLoading(false);
+        });
       }
-    });
-    return unsub;
+
+      fallbackTimeout = setTimeout(() => {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }, 3000);
+    }
+
+    initSession();
+
+    return () => {
+      isMounted = false;
+      if (fallbackTimeout) clearTimeout(fallbackTimeout);
+      if (unsubAuth) unsubAuth();
+    };
   }, []);
 
   useEffect(() => {
     if (!firebaseUser) return;
     const ref = doc(db, "users", firebaseUser.uid);
-    const unsub = onSnapshot(ref, (snap) => {
-      if (snap.exists()) {
-        setProfile({ uid: snap.id, ...(snap.data() as any) });
+    const unsub = onSnapshot(
+      ref,
+      (snap) => {
+        if (snap.exists()) {
+          setProfile({ uid: snap.id, ...(snap.data() as any) });
+        }
+        setLoading(false);
+      },
+      (err) => {
+        console.error("Profile load error:", err);
+        setLoading(false);
       }
-      setLoading(false);
-    });
+    );
     return unsub;
   }, [firebaseUser]);
 
@@ -87,8 +146,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function register(fullName: string, username: string, email: string, password: string) {
     const cred = await createUserWithEmailAndPassword(auth, email, password);
-    await createProfileIfMissing(cred.user.uid, { fullName, username, email: email ?? "" });
-    await sendEmailVerification(cred.user);
+    try {
+      await AsyncStorage.setItem(
+        "@coursearena_user_session",
+        JSON.stringify({ uid: cred.user.uid, email: cred.user.email })
+      );
+    } catch {}
+    await createProfileIfMissing(cred.user.uid, { fullName, username, email: email ?? "" }, true);
   }
 
   // Google/Apple sign-in skip the register() form entirely, so the first
@@ -98,7 +162,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // trust a client-set balance.
   async function createProfileIfMissing(
     uid: string,
-    info: { fullName: string; username: string; email: string }
+    info: { fullName: string; username: string; email: string },
+    isEmailVerified = false
   ) {
     const ref = doc(db, "users", uid);
     const existing = await getDoc(ref);
@@ -110,18 +175,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       role: "user",
       balance: 0,
       signupBonusGiven: false,
-      emailVerified: false,
+      emailVerified: isEmailVerified,
       onboardingCompleted: false,
       status: "active",
+      policyAccepted: true,
+      policyAcceptedAt: serverTimestamp(),
       createdAt: serverTimestamp(),
     });
   }
 
   async function login(email: string, password: string) {
-    await signInWithEmailAndPassword(auth, email, password);
+    const cred = await signInWithEmailAndPassword(auth, email, password);
+    try {
+      await AsyncStorage.setItem(
+        "@coursearena_user_session",
+        JSON.stringify({ uid: cred.user.uid, email: cred.user.email })
+      );
+    } catch {}
   }
 
   async function logout() {
+    try {
+      await AsyncStorage.removeItem("@coursearena_user_session");
+    } catch {}
+    setFirebaseUser(null);
+    setProfile(null);
     await firebaseSignOut(auth);
   }
 

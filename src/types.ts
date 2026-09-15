@@ -15,13 +15,16 @@ export interface UserProfile {
   emailVerified: boolean;
   onboardingCompleted: boolean;
   status: "active" | "suspended";
+  policyAccepted?: boolean;
+  policyAcceptedAt?: any;
   createdAt: any;
 }
 
 export interface Category {
   id: string;
   name: string;
-  slug: string;
+  slug?: string;
+  pinnedCourseIds?: string[];
 }
 
 export type ReviewStatus = "draft" | "pending_review" | "approved" | "rejected" | "suspended";
@@ -35,6 +38,7 @@ export interface Course {
   description: string;
   image: string | null; // Storage download URL
   price: number;
+  isPinned?: boolean;
   // NOTE: the real accessLink is NOT a field on this document — it lives
   // in a separate `course_access/{courseId}` doc that non-buyers can't
   // read (see firestore.rules). Buyers get it back from the
@@ -50,6 +54,7 @@ export interface Course {
   commentCount: number;
   avgRating: number;
   ratingCount: number;
+  reportCount?: number;
   createdAt: any;
   updatedAt: any;
 }
@@ -68,7 +73,9 @@ export type TransactionType =
   | "purchase"
   | "admin_gift"
   | "course_approval_reward"
-  | "refund";
+  | "refund"
+  | "gift_sent"
+  | "gift_received";
 
 export interface WalletTransaction {
   id: string;
@@ -90,14 +97,26 @@ export interface PaymentTransaction {
   verifiedAt: any | null;
 }
 
+export interface BroadcastButton {
+  id?: string;
+  label: string;
+  type: "link" | "copy";
+  value: string;
+}
+
 export interface AppNotification {
   id: string;
   targetUserId: string | null; // null = broadcast
   title: string;
   message: string;
-  type: "system" | "report";
-  reportId: string | null;
-  expiresAt: any | null;
+  type?: "system" | "report" | "course" | "wallet" | "chat" | "promo" | "security" | string;
+  reportId?: string | null;
+  courseId?: string | null;
+  actionUrl?: string | null;
+  promoCode?: string | null;
+  buttons?: BroadcastButton[];
+  read?: boolean;
+  expiresAt?: any | null;
   createdAt: any;
 }
 

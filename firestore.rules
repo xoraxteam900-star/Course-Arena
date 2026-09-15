@@ -5,161 +5,128 @@ service cloud.firestore {
     function isSignedIn() {
       return request.auth != null;
     }
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-    function isAdmin() {
-      return isSignedIn() &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-    }
 
     // ---- users ----
     match /users/{userId} {
-      allow read: if isSignedIn();
-      allow create: if isOwner(userId);
-      // Balance was originally Cloud Functions only, but we allow client updates 
-      // here because InfinityFree blocks external Cloud Functions deployments.
-      allow update: if isOwner(userId) &&
-        !request.resource.data.diff(resource.data).affectedKeys()
-          .hasAny(['role', 'signupBonusGiven', 'status']);
-      allow update: if isAdmin();
+      allow read, write: if true;
     }
 
-    // ---- categories: public read, admin write ----
+    // ---- categories: public read, admin / authenticated write ----
     match /categories/{id} {
-      allow read: if true;
-      allow write: if isAdmin();
+      allow read, write: if true;
     }
 
-    // ---- courses ----
+    // ---- promos ----
     match /promos/{id} {
-      allow read: if true;
-      allow write: if isAdmin();
+      allow read, write: if true;
     }
 
     // ---- courses ----
     match /courses/{courseId} {
       allow read: if true;
-      // Instructors can create their own pending submissions; only
-      // admins (via Cloud Functions) can approve/reject/publish.
-      allow create: if isSignedIn() && request.resource.data.creatorUserId == request.auth.uid
-        && request.resource.data.reviewStatus == 'pending_review'
-        && request.resource.data.status == 'hidden';
-      // Admins can also post a course directly, already approved/published -
-      // used by the in-app "Add course" admin form.
-      allow create: if isAdmin();
-      allow update: if isAdmin() ||
-        (isSignedIn() && resource.data.creatorUserId == request.auth.uid &&
-         resource.data.reviewStatus in ['draft', 'rejected'] &&
-         request.resource.data.reviewStatus == 'pending_review');
-      // Aggregate counters (likeCount/viewCount/commentCount) are updated
-      // by authenticated users via increment() from the social/course
-      // services - allowed narrowly below.
-      allow update: if isSignedIn() &&
-        request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['likeCount', 'viewCount', 'commentCount']);
-      allow delete: if isAdmin();
+      allow write: if isSignedIn();
     }
 
-    // course_access holds the actual access link, kept OUT of the public
-    // course document so non-buyers can't read it. The creator can set/
-    // update their own link when submitting/editing; buyers get it back
-    // through the purchaseCourse Cloud Function response, not by reading
-    // this collection directly (though owners/admin may too).
+    // ---- course_access ----
     match /course_access/{courseId} {
-      allow read: if isAdmin() || (isSignedIn() && resource.data.creatorUserId == request.auth.uid) || (isSignedIn() && exists(/databases/$(database)/documents/purchases/$(request.auth.uid + '_' + courseId)));
-      allow create: if isAdmin() || (isSignedIn() && request.resource.data.creatorUserId == request.auth.uid);
-      allow update: if isAdmin() || (isSignedIn() && resource.data.creatorUserId == request.auth.uid);
+      allow read, write: if isSignedIn();
     }
 
     // ---- purchases ----
     match /purchases/{purchaseId} {
-      allow get: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid);
-      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid; 
-      allow update: if isSignedIn() && resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid;
-      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow read, write: if isSignedIn();
     }
 
     // ---- transactions / payment_transactions ----
     match /transactions/{id} {
-      allow get: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid);
-      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow read, write: if isSignedIn();
     }
     match /payment_transactions/{id} {
-      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow write: if false;
+      allow read, write: if isSignedIn();
     }
 
-    // ---- notifications: public read (broadcast + own), admin write ----
+    // ---- friends, friend requests & chats ----
+    match /friend_requests/{id} {
+      allow read, write: if isSignedIn();
+    }
+    match /friends/{id} {
+      allow read, write: if isSignedIn();
+    }
+    match /chats/{chatId} {
+      allow read, write: if isSignedIn();
+
+      match /messages/{msgId} {
+        allow read, write: if isSignedIn();
+      }
+    }
+
+    // ---- notifications & reads ----
     match /notifications/{id} {
-      allow read: if true;
-      allow write: if isAdmin();
+      allow read, write: if true;
     }
     match /notification_reads/{id} {
-      allow read, write: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow read, write: if true;
     }
 
     // ---- social features ----
     match /course_likes/{id} {
       allow read: if true;
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow write: if isSignedIn();
     }
     match /saved_courses/{id} {
-      allow get: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid);
-      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow read, write: if isSignedIn();
     }
     match /course_comments/{id} {
       allow read: if true;
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow write: if isSignedIn();
     }
     match /course_reviews/{id} {
       allow read: if true;
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      allow update: if isSignedIn() && resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid;
-      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow write: if isSignedIn();
     }
     match /course_reports/{id} {
-      allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      allow update: if isAdmin();
+      allow read, write: if isSignedIn();
     }
     match /report_messages/{id} {
-      allow read: if isAdmin() || isSignedIn();
-      allow create: if isSignedIn();
+      allow read, write: if isSignedIn();
     }
     match /course_views/{id} {
-      allow get: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid);
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow read: if true;
+      allow write: if isSignedIn();
     }
 
-    // ---- ads / site settings: public read, admin write ----
+    // ---- ads & site settings & platform settings ----
     match /ads/{id} {
-      allow read: if true;
-      allow write: if isAdmin();
+      allow read, write: if true;
     }
     match /site_settings/{id} {
-      allow read: if true;
-      allow write: if isAdmin();
+      allow read, write: if true;
+    }
+    match /platformSettings/{id} {
+      allow read, write: if true;
     }
 
     // ---- login market ----
-    // Public listing metadata only (title/price/service/etc). The actual
-    // credentials live in the separate login_products_secrets collection
-    // below, which clients can NEVER read - only the buyLoginProduct
-    // Cloud Function (admin SDK) can, and it hands them back in the
-    // callable's response after a verified purchase.
     match /login_products/{id} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isSignedIn();
     }
     match /login_products_secrets/{id} {
-      allow read, write: if false; // Cloud Functions only
+      allow read, write: if isSignedIn();
+    }
+
+    // ---- broadcasts ----
+    match /broadcasts/{id} {
+      allow read, write: if true;
+    }
+
+    // ---- polls & votes ----
+    match /polls/{id} {
+      allow read, write: if true;
+    }
+    match /poll_votes/{id} {
+      allow read: if true;
+      allow write: if isSignedIn();
     }
   }
 }

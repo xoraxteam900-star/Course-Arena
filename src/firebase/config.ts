@@ -1,7 +1,10 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { initializeAuth, getAuth, getReactNativePersistence } from "@firebase/auth";
+// @ts-ignore
+import * as FirebaseAuth from "firebase/auth";
+// @ts-ignore
+import * as AtFirebaseAuth from "@firebase/auth";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, setLogLevel } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { Platform } from "react-native";
 
@@ -16,27 +19,46 @@ const firebaseConfig = {
 
 export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
-// Auth needs AsyncStorage persistence on native so sessions survive app restarts.
-// On web, the default browser persistence is fine.
+const getPersistence = () => {
+  try {
+    if (typeof (FirebaseAuth as any).getReactNativePersistence === "function") {
+      return (FirebaseAuth as any).getReactNativePersistence(AsyncStorage);
+    }
+  } catch {}
+  try {
+    if (typeof (AtFirebaseAuth as any).getReactNativePersistence === "function") {
+      return (AtFirebaseAuth as any).getReactNativePersistence(AsyncStorage);
+    }
+  } catch {}
+  try {
+    const rnAuth = require("@firebase/auth/dist/rn/index.js");
+    if (typeof rnAuth.getReactNativePersistence === "function") {
+      return rnAuth.getReactNativePersistence(AsyncStorage);
+    }
+  } catch {}
+  return undefined;
+};
+
 export const auth =
   Platform.OS === "web"
-    ? getAuth(app)
+    ? FirebaseAuth.getAuth(app)
     : (() => {
         try {
-          return initializeAuth(app, {
-            persistence: getReactNativePersistence(AsyncStorage),
-          });
-        } catch (error: any) {
-          if (error.code !== "auth/already-initialized") {
-            console.error("initializeAuth error:", error);
-            alert("Auth Init Error: " + (error.message || error.toString()));
+          const persistence = getPersistence();
+          if (persistence) {
+            return FirebaseAuth.initializeAuth(app, { persistence });
           }
-          // initializeAuth throws if already called (e.g. fast refresh) - fall back.
-          return getAuth(app);
+          return FirebaseAuth.initializeAuth(app);
+        } catch (error: any) {
+          // initializeAuth throws if already called (e.g. fast refresh / reload)
+          return FirebaseAuth.getAuth(app);
         }
       })();
 
 export const db = getFirestore(app);
+try {
+  setLogLevel("silent");
+} catch {}
 export const storage = getStorage(app);
 
 export const FUNCTIONS_BASE_URL = process.env.EXPO_PUBLIC_FUNCTIONS_BASE_URL || "";

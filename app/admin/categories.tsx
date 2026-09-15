@@ -72,14 +72,30 @@ export default function AdminCategories() {
       <FlatList
         data={categories}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <Text style={styles.cardText}>{item.name}</Text>
-            <Pressable style={styles.deleteBtn} onPress={() => deleteCat(item.id)}>
-              <Text style={styles.deleteBtnText}>Delete</Text>
-            </Pressable>
-          </View>
-        )}
+        renderItem={({ item }) => {
+          const pinnedCount = (item.pinnedCourseIds || []).length;
+          return (
+            <View style={styles.card}>
+              <View>
+                <Text style={styles.cardText}>{item.name}</Text>
+                <Text style={styles.cardPinnedText}>
+                  📌 {pinnedCount} / 3 courses pinned
+                </Text>
+              </View>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Pressable
+                  style={styles.managePinsBtn}
+                  onPress={() => router.push("/admin/courses")}
+                >
+                  <Text style={styles.managePinsBtnText}>Manage Pins</Text>
+                </Pressable>
+                <Pressable style={styles.deleteBtn} onPress={() => deleteCat(item.id)}>
+                  <Text style={styles.deleteBtnText}>Delete</Text>
+                </Pressable>
+              </View>
+            </View>
+          );
+        }}
       />
     </View>
     </SafeAreaView>
@@ -94,7 +110,10 @@ const styles = StyleSheet.create({
   addBtn: { backgroundColor: "#6366F1", justifyContent: "center", paddingHorizontal: 20, borderRadius: 12 },
   addBtnText: { color: "#fff", fontWeight: "700" },
   card: { flexDirection: "row", backgroundColor: "#1E293B", padding: 16, borderRadius: 12, marginBottom: 10, alignItems: "center", justifyContent: "space-between" },
-  cardText: { color: "#fff", fontSize: 16 },
+  cardText: { color: "#fff", fontSize: 16, fontWeight: "600" },
+  cardPinnedText: { color: "#FBBF24", fontSize: 12, marginTop: 4, fontWeight: "500" },
+  managePinsBtn: { backgroundColor: "rgba(99, 102, 241, 0.2)", borderWidth: 1, borderColor: "rgba(99, 102, 241, 0.4)", paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  managePinsBtnText: { color: "#A5B4FC", fontWeight: "700", fontSize: 12 },
   deleteBtn: { backgroundColor: "#F87171", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
   deleteBtnText: { color: "#0F172A", fontWeight: "700", fontSize: 13 },
 });

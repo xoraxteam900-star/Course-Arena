@@ -80,10 +80,9 @@ export async function submitReview(
   courseId: string,
   userId: string,
   rating: number,
-  reviewText: string
-) {
-  // One review per user per course - deterministic doc id enforces this,
-  // mirroring the unique key on (user_id, course_id).
+  reviewText: string = ""
+): Promise<{ avgRating: number; ratingCount: number }> {
+  // One review per user per course - deterministic doc id enforces this
   const ref = doc(db, "course_reviews", `${userId}_${courseId}`);
   const existing = await getDoc(ref);
   await setDoc(
@@ -92,15 +91,53 @@ export async function submitReview(
       courseId,
       userId,
       rating,
-      reviewText,
+      reviewText: reviewText || "",
       createdAt: existing.exists() ? existing.data()?.createdAt : serverTimestamp(),
       updatedAt: serverTimestamp(),
     },
     { merge: true }
   );
-  // Recomputing avgRating/ratingCount accurately under concurrent writes
-  // needs a transaction; that's done server-side in the
-  // `onReviewWrite` Cloud Function trigger (functions/triggers.js).
+
+  // Recalculate course avgRating and ratingCount directly in Firestore
+  const q = query(collection(db, "course_reviews"), where("courseId", "==", courseId));
+  const snap = await getDocs(q);
+  const ratings: number[] = [];
+  snap.forEach((d) => {
+    const data = d.data();
+    if (typeof data.rating === "number" && data.rating > 0) {
+      ratings.push(data.rating);
+    }
+  });
+
+  const ratingCount = ratings.length;
+  const avgRating = ratingCount > 0
+    ? Math.round((ratings.reduce((sum, r) => sum + r, 0) / ratingCount) * 10) / 10
+    : 0;
+
+  await updateDoc(doc(db, "courses", courseId), {
+    avgRating,
+    ratingCount,
+    updatedAt: serverTimestamp(),
+  });
+
+  return { avgRating, ratingCount };
+}
+
+export async function getUserCourseReview(courseId: string, userId: string) {
+  const ref = doc(db, "course_reviews", `${userId}_${courseId}`);
+  const snap = await getDoc(ref);
+  return snap.exists() ? snap.data() : null;
+}
+
+export async function listReviews(courseId: string) {
+  const snap = await getDocs(
+    query(
+      collection(db, "course_reviews"),
+      where("courseId", "==", courseId),
+      orderBy("updatedAt", "desc")
+    )
+  );
+  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) }));
 }
 
 export async function fileReport(courseId: string, userId: string, reason: string) {
@@ -112,5 +149,9 @@ export async function fileReport(courseId: string, userId: string, reason: strin
     lastMessageAt: serverTimestamp(),
     userSeenAt: null,
     createdAt: serverTimestamp(),
+  });
+  await updateDoc(doc(db, "courses", courseId), {
+    reportCount: increment(1),
+    updatedAt: serverTimestamp(),
   });
 }

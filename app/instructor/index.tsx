@@ -27,10 +27,34 @@ export default function InstructorHub() {
     load();
   }, [load]);
 
+  if (profile?.role !== "admin") {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: "#0F172A", justifyContent: "center", alignItems: "center", padding: 24 }}>
+        <Text style={{ color: "#FFFFFF", fontSize: 20, fontWeight: "800", textAlign: "center", marginBottom: 8 }}>
+          Submissions Closed
+        </Text>
+        <Text style={{ color: "#94A3B8", fontSize: 14, textAlign: "center", lineHeight: 20, marginBottom: 24 }}>
+          Course creation is currently restricted to platform administrators.
+        </Text>
+        <Pressable
+          style={{ backgroundColor: "#1769E0", paddingVertical: 12, paddingHorizontal: 24, borderRadius: 10 }}
+          onPress={() => router.back()}
+        >
+          <Text style={{ color: "#FFFFFF", fontWeight: "700" }}>Go Back</Text>
+        </Pressable>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#0F172A" }}>
-    <View style={styles.container}>
-      <Text style={styles.title}>Your submitted courses</Text>
+      <View style={styles.container}>
+        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 16, gap: 12 }}>
+          <Pressable onPress={() => router.back()} hitSlop={10}>
+            <Text style={{ color: "#94A3B8", fontSize: 16 }}>← Back</Text>
+          </Pressable>
+          <Text style={[styles.title, { marginBottom: 0 }]}>Your submitted courses</Text>
+        </View>
       <Pressable style={styles.newBtn} onPress={() => router.push("/instructor/new-course")}>
         <Text style={styles.newBtnText}>+ Submit a new course</Text>
       </Pressable>
