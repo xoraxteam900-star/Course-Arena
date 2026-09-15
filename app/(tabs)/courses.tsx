@@ -6,6 +6,7 @@ import { listCategories, listPublishedCourses } from "@/services/courses";
 import { Category, Course } from "@/types";
 import { useTheme } from "@/contexts/ThemeContext";
 import { FadeInView } from "@/components/FadeInView";
+import { CourseThumbnail } from "@/components/CourseThumbnail";
 
 export default function Courses() {
   const { colors } = useTheme();
@@ -62,8 +63,24 @@ export default function Courses() {
         numColumns={2}
         columnWrapperStyle={{ gap: 12 }}
         renderItem={({ item }) => (
-          <Pressable style={[styles.card, { backgroundColor: colors.card, shadowColor: colors.shadow }]} onPress={() => router.push(`/course/${item.id}`)}>
-            {item.image ? <Image source={{ uri: item.image }} style={styles.thumb} /> : <View style={[styles.thumb, { backgroundColor: colors.border }]} />}
+          <Pressable 
+            style={[styles.card, { backgroundColor: colors.card, shadowColor: colors.shadow }]} 
+            onPress={() => router.push({
+              pathname: `/course/${item.id}`,
+              params: {
+                initialTitle: item.title,
+                initialImage: item.image || "",
+                initialPrice: String(item.price ?? 0),
+                initialCategoryId: item.categoryId || "",
+              }
+            })}
+          >
+            <CourseThumbnail 
+              uri={item.image} 
+              title={item.title} 
+              style={styles.thumb} 
+              containerStyle={{ width: "100%", height: 90, borderRadius: 10, marginBottom: 8 }}
+            />
             <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={2}>{item.title}</Text>
             <Text style={[styles.cardMeta, { color: colors.textDim }]}>GH₵{item.price.toFixed(2)}</Text>
           </Pressable>

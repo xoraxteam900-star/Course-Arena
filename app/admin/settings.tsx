@@ -181,7 +181,7 @@ export default function AdminSettings() {
     setSaving(true);
     try {
       await saveCourseBoxConfig(updated);
-      showSavedIndicator("Reset to default (200 × 100)!");
+      showSavedIndicator("Reset to default (Standard 240 × 130)!");
     } catch (e) {
       Alert.alert("Error", "Failed to reset course box size");
     } finally {
@@ -470,7 +470,7 @@ export default function AdminSettings() {
           {/* Reset button */}
           <Pressable style={styles.resetBtn} onPress={handleResetBoxConfig}>
             <Ionicons name="refresh-outline" size={16} color="#94A3B8" />
-            <Text style={styles.resetBtnText}>Reset to Default (200 × 100)</Text>
+            <Text style={styles.resetBtnText}>Reset to Default (Standard 240 × 130)</Text>
           </Pressable>
 
           <View style={styles.divider} />

@@ -698,11 +698,12 @@ export default function MyCourses() {
               {selectedCourse && (
                 <>
                   <View style={styles.modalCoursePreview}>
-                    {selectedCourse.image ? (
-                      <Image source={{ uri: selectedCourse.image }} style={styles.modalPreviewThumb} />
-                    ) : (
-                      <View style={[styles.modalPreviewThumb, { backgroundColor: "#1E293B" }]} />
-                    )}
+                    <CourseThumbnail
+                      uri={selectedCourse.image}
+                      title={selectedCourse.title}
+                      style={styles.modalPreviewThumb}
+                      containerStyle={{ width: 44, height: 44, borderRadius: 8 }}
+                    />
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.modalCourseTitle, { color: textColor }]} numberOfLines={1}>
                         {selectedCourse.title}
@@ -730,7 +731,15 @@ export default function MyCourses() {
                     style={styles.modalOption}
                     onPress={() => {
                       setShowOptionsModal(false);
-                      router.push(`/course/${selectedCourse.id}`);
+                      router.push({
+                        pathname: `/course/${selectedCourse.id}`,
+                        params: {
+                          initialTitle: selectedCourse.title,
+                          initialImage: selectedCourse.image || "",
+                          initialPrice: String(selectedCourse.price ?? 0),
+                          initialCategoryId: selectedCourse.categoryId || "",
+                        }
+                      });
                     }}
                   >
                     <Ionicons name="information-circle-outline" size={22} color={textColor} />

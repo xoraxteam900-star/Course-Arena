@@ -21,6 +21,11 @@ export function CourseThumbnail({
   const [retryWithProxy, setRetryWithProxy] = useState(false);
   const [hasError, setHasError] = useState(false);
 
+  React.useEffect(() => {
+    setRetryWithProxy(false);
+    setHasError(false);
+  }, [uri]);
+
   const normalized = normalizeImageUrl(uri);
 
   // If initial load fails and URL is not already proxied, automatically retry via Cloudflare CDN
@@ -70,6 +75,7 @@ export function CourseThumbnail({
 const styles = StyleSheet.create({
   wrapper: {
     overflow: "hidden",
+    flexShrink: 0,
   },
   image: {
     width: "100%",
@@ -81,6 +87,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     overflow: "hidden",
     position: "relative",
+    flexShrink: 0,
   },
   fallbackIconBadge: {
     width: 44,

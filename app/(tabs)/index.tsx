@@ -28,6 +28,7 @@ import { db } from "@/firebase/config";
 import { FadeInView } from "@/components/FadeInView";
 import { CommunityPollCard } from "@/components/CommunityPollCard";
 import { CourseThumbnail } from "@/components/CourseThumbnail";
+import { normalizeImageUrl } from "@/utils/imageUrl";
 import { Poll, listenToActivePolls } from "@/services/polls";
 import * as WebBrowser from "expo-web-browser";
 import * as Clipboard from "@/utils/clipboard";
@@ -92,10 +93,10 @@ const CategoryCourseSlider = ({ courses, savedIds, handleToggleSave, colors, ind
         }, 100);
       }}
       renderItem={({ item, index: itemIdx }) => {
-        const cardW = boxConfig?.cardWidth ? Math.max(boxConfig.cardWidth, 240) : 240;
-        const imgH = boxConfig?.imageHeight ? Math.max(boxConfig.imageHeight, 130) : 130;
+        const cardW = boxConfig?.cardWidth ?? 240;
+        const imgH = boxConfig?.imageHeight ?? 130;
         const radius = boxConfig?.borderRadius ?? 16;
-        const imgRadius = Math.max(radius - 4, 8);
+        const imgRadius = Math.max(radius - 4, 6);
         const titleSize = boxConfig?.titleFontSize ?? 14;
         const priceSize = boxConfig?.priceFontSize ?? 13;
 
@@ -106,6 +107,7 @@ const CategoryCourseSlider = ({ courses, savedIds, handleToggleSave, colors, ind
                 uri={item.image}
                 title={item.title}
                 style={[styles.cardImage, { height: imgH, borderRadius: imgRadius }]}
+                containerStyle={{ height: imgH, borderRadius: imgRadius }}
                 resizeMode="cover"
               />
               {item.isPinned && (
@@ -116,7 +118,15 @@ const CategoryCourseSlider = ({ courses, savedIds, handleToggleSave, colors, ind
               )}
             </View>
             <Text 
-              style={[styles.cardTitle, { color: colors.text, fontSize: titleSize, minHeight: 38 }]} 
+              style={[
+                styles.cardTitle, 
+                { 
+                  color: colors.text, 
+                  fontSize: titleSize, 
+                  minHeight: titleSize <= 12 ? 28 : 38,
+                  lineHeight: titleSize <= 12 ? 15 : 19,
+                } 
+              ]} 
               numberOfLines={2}
             >
               {item.title}
@@ -153,7 +163,16 @@ const CategoryCourseSlider = ({ courses, savedIds, handleToggleSave, colors, ind
                 borderRadius: radius,
               }
             ]} 
-            onPress={() => router.push(`/course/${item.id}`)}
+            onPress={() => router.push({
+              pathname: `/course/${item.id}`,
+              params: {
+                initialTitle: item.title,
+                initialImage: item.image || "",
+                initialPrice: String(item.price ?? 0),
+                initialCategoryId: item.categoryId || "",
+                initialSubtitle: (item as any).subtitle || "",
+              }
+            })}
           >
             {content}
           </Pressable>
@@ -326,7 +345,18 @@ export default function Dashboard() {
       
       snap.docs.forEach(d => knownCourses.current.add(d.id));
 
-      const allCourses = snap.docs.map(d => ({ id: d.id, ...d.data() } as Course));
+      const allCourses = snap.docs.map(d => {
+        const data = d.data() as any;
+        const normalizedImg = normalizeImageUrl(data.image) || data.image || null;
+        if (normalizedImg && typeof normalizedImg === "string") {
+          Image.prefetch(normalizedImg).catch(() => {});
+        }
+        return {
+          id: d.id,
+          ...data,
+          image: normalizedImg,
+        } as Course;
+      });
       const newGroups = categories.map(cat => ({
         category: cat,
         courses: allCourses.filter(c => c.categoryId === cat.id).slice(0, 6)

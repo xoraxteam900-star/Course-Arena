@@ -21,6 +21,7 @@ import * as Clipboard from "@/utils/clipboard";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { CourseThumbnail } from "@/components/CourseThumbnail";
+import { normalizeImageUrl } from "@/utils/imageUrl";
 import { getCourse, myPurchases, recordCourseView, listCategories } from "@/services/courses";
 import { toggleLike, toggleSave, addComment, listComments, submitReview, fileReport, editComment, deleteComment } from "@/services/social";
 import { purchaseCourse, getMyAccessLink } from "@/services/wallet";
@@ -39,11 +40,46 @@ const REPORT_REASONS = [
 
 export default function CourseDetail() {
   const insets = useSafeAreaInsets();
-  const { id, promo, discount } = useLocalSearchParams<{ id: string; promo?: string; discount?: string }>();
+  const { 
+    id, 
+    promo, 
+    discount, 
+    initialTitle, 
+    initialImage, 
+    initialPrice, 
+    initialCategoryId, 
+    initialSubtitle 
+  } = useLocalSearchParams<{ 
+    id: string; 
+    promo?: string; 
+    discount?: string;
+    initialTitle?: string;
+    initialImage?: string;
+    initialPrice?: string;
+    initialCategoryId?: string;
+    initialSubtitle?: string;
+  }>();
   const { profile } = useAuth();
   const { colors, isDark } = useTheme();
 
-  const [course, setCourse] = useState<Course | null>(null);
+  const [course, setCourse] = useState<Course | null>(() => {
+    if (!id) return null;
+    if (initialTitle) {
+      return {
+        id,
+        title: initialTitle,
+        subtitle: initialSubtitle || "Here we go",
+        image: normalizeImageUrl(initialImage) || initialImage || null,
+        price: initialPrice ? parseFloat(initialPrice) : 0,
+        categoryId: initialCategoryId || "",
+        status: "published",
+        reviewStatus: "approved",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as unknown as Course;
+    }
+    return null;
+  });
   const [categories, setCategories] = useState<Category[]>([]);
   const [owned, setOwned] = useState(false);
   const [comments, setComments] = useState<CourseComment[]>([]);
@@ -101,7 +137,14 @@ export default function CourseDetail() {
   useEffect(() => {
     if (!id) return;
     const unsub = onSnapshot(doc(db, "courses", id), (snap) => {
-      if (snap.exists()) setCourse({ id: snap.id, ...snap.data() } as Course);
+      if (snap.exists()) {
+        const data = snap.data() as any;
+        setCourse({ 
+          id: snap.id, 
+          ...data,
+          image: normalizeImageUrl(data.image) || data.image || null,
+        } as Course);
+      }
     });
     return () => unsub();
   }, [id]);
@@ -299,11 +342,12 @@ export default function CourseDetail() {
 
           <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
             {/* HERO COURSE IMAGE BANNER */}
-            <View style={[styles.heroContainer, { borderColor: borderCol }]}>
+            <View style={[styles.heroContainer, { borderColor: borderCol, backgroundColor: cardBg }]}>
               <CourseThumbnail
                 uri={course.image}
                 title={course.title}
                 style={styles.heroImage}
+                containerStyle={{ width: "100%", height: 235 }}
                 resizeMode="cover"
               />
             </View>
@@ -786,7 +830,7 @@ const styles = StyleSheet.create({
   },
   heroImage: {
     width: "100%",
-    height: "100%",
+    height: 235,
   },
   heroPlaceholder: {
     width: "100%",
