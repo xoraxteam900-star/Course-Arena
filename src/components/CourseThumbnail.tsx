@@ -18,15 +18,22 @@ export function CourseThumbnail({
   containerStyle,
   resizeMode = "cover",
 }: CourseThumbnailProps) {
+  const [retryWithProxy, setRetryWithProxy] = useState(false);
   const [hasError, setHasError] = useState(false);
+
   const normalized = normalizeImageUrl(uri);
+
+  // If initial load fails and URL is not already proxied, automatically retry via Cloudflare CDN
+  const displayUri = retryWithProxy && normalized && !normalized.includes("wsrv.nl")
+    ? `https://wsrv.nl/?url=${encodeURIComponent(normalized)}`
+    : normalized;
 
   // Derive initials / placeholder text
   const initial = (title || "C").trim().charAt(0).toUpperCase();
 
-  if (!normalized || hasError) {
+  if (!displayUri || hasError) {
     return (
-      <View style={[styles.fallbackContainer, containerStyle, style as any]}>
+      <View style={[styles.fallbackContainer, style as any, containerStyle]}>
         <View style={styles.fallbackIconBadge}>
           <Ionicons name="book-outline" size={24} color="#818CF8" />
         </View>
@@ -39,13 +46,22 @@ export function CourseThumbnail({
     );
   }
 
+  const handleError = () => {
+    if (!retryWithProxy && normalized && !normalized.includes("wsrv.nl")) {
+      setRetryWithProxy(true);
+    } else {
+      setHasError(true);
+    }
+  };
+
   return (
-    <View style={[styles.wrapper, containerStyle]}>
+    <View style={[styles.wrapper, style as any, containerStyle]}>
       <Image
-        source={{ uri: normalized }}
+        source={{ uri: displayUri }}
         style={[styles.image, style]}
         resizeMode={resizeMode}
-        onError={() => setHasError(true)}
+        fadeDuration={150}
+        onError={handleError}
       />
     </View>
   );

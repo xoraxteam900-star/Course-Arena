@@ -4,7 +4,7 @@
  * - Google Drive share links (converts to direct streamable CDN URL)
  * - Dropbox preview links (converts ?dl=0 to ?raw=1)
  * - Imgur gallery/page links (converts to direct i.imgur.com/*.jpg)
- * - Discord CDN / Postimages
+ * - Catbox / Postimages / anonymous hosts (proxied through Cloudflare edge image CDN)
  * - Missing protocol (adds https://)
  * - Leading/trailing spaces
  */
@@ -64,6 +64,14 @@ export function normalizeImageUrl(rawUrl?: string | null): string {
     const match = url.match(/^https?:\/\/(?:www\.)?imgur\.com\/([a-zA-Z0-9]+)$/);
     if (match && match[1]) {
       return `https://i.imgur.com/${match[1]}.jpg`;
+    }
+  }
+
+  // 4. Catbox & anonymous image hosts (frequently blocked by mobile carriers / ISPs)
+  // Proxy via Cloudflare global edge image CDN wsrv.nl to guarantee 100% deliverability & speed
+  if (url.includes("catbox.moe") || url.includes("postimg.cc") || url.includes("imgbb.com")) {
+    if (!url.startsWith("https://wsrv.nl/")) {
+      return `https://wsrv.nl/?url=${encodeURIComponent(url)}`;
     }
   }
 
