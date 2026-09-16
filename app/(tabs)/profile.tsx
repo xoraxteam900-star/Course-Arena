@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import {
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -31,7 +31,7 @@ export default function Profile() {
   const { profile, logout } = useAuth();
   const { theme, setTheme, colors, isDark } = useTheme();
   const [showPolicyModal, setShowPolicyModal] = useState(false);
-  const [unreadNotifCount, setUnreadNotifCount] = useState(3);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [features, setFeatures] = useState<PlatformFeatures>({
     enableGifting: true,
     enableChat: true,
@@ -47,17 +47,19 @@ export default function Profile() {
     return () => unsub();
   }, []);
 
-  useEffect(() => {
-    if (!profile?.uid) return;
-    listNotificationsFor(profile.uid)
-      .then((notifs) => {
-        const unread = notifs.filter((n) => !n.read).length;
-        setUnreadNotifCount(unread > 0 ? unread : 3);
-      })
-      .catch(() => {
-        setUnreadNotifCount(3);
-      });
-  }, [profile?.uid]);
+  useFocusEffect(
+    useCallback(() => {
+      if (!profile?.uid) return;
+      listNotificationsFor(profile.uid)
+        .then((notifs) => {
+          const unread = notifs.filter((n) => !n.read).length;
+          setUnreadNotifCount(unread);
+        })
+        .catch(() => {
+          setUnreadNotifCount(0);
+        });
+    }, [profile?.uid])
+  );
 
   const firstName = profile?.fullName ? profile.fullName.split(" ")[0] : "Kwasi";
   const roleTitle =
@@ -246,18 +248,19 @@ export default function Profile() {
             {profile?.role === "admin" && (
               <Pressable
                 style={[styles.menuItem, { backgroundColor: cardBg, borderColor: borderCol }]}
-                onPress={() => router.push("/admin")}
+                onPress={() => router.push("/admin/settings")}
               >
-                <View style={[styles.menuIconBox, { backgroundColor: "rgba(16, 185, 129, 0.15)" }]}>
-                  <Ionicons name="shield-checkmark-outline" size={22} color="#34D399" />
+                <View style={[styles.menuIconBox, { backgroundColor: "rgba(239, 68, 68, 0.15)" }]}>
+                  <Ionicons name="construct-outline" size={22} color="#EF4444" />
                 </View>
                 <View style={styles.menuTextBox}>
-                  <Text style={[styles.menuTitle, { color: textColor }]}>Admin panel</Text>
-                  <Text style={[styles.menuSub, { color: textDimColor }]}>Access dashboard and tools</Text>
+                  <Text style={[styles.menuTitle, { color: textColor }]}>Admin Tools</Text>
+                  <Text style={[styles.menuSub, { color: textDimColor }]}>Platform settings & moderation</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color="#64748B" />
               </Pressable>
             )}
+
 
             {/* INSTRUCTOR PANEL */}
             {profile?.role === "instructor" && (

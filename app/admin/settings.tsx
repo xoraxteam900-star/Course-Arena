@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, Switch, ActivityIndicator, Alert, ScrollView, Pressable, Image } from "react-native";
+import { View, Text, StyleSheet, Switch, ActivityIndicator, Alert, ScrollView, Pressable, Image, TextInput } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth } from "@/contexts/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import { getNavbarConfig, saveNavbarConfig, IosNavbarTemplate, AndroidNavbarTemplate, NavbarConfig } from "@/services/navbarSettings";
 import { 
   getCourseBoxConfig, 
@@ -13,6 +14,7 @@ import {
   COURSE_BOX_PRESETS, 
   defaultCourseBoxConfig 
 } from "@/services/dashboardSettings";
+import { adminWipeAllNotifications } from "@/services/notifications";
 import {
   getPlatformFeatures,
   savePlatformFeatures,
@@ -214,8 +216,44 @@ export default function AdminSettings() {
       ) : (
         <ScrollView contentContainerStyle={styles.settingsList} showsVerticalScrollIndicator={false}>
 
+          {/* DANGER ZONE: NOTIFICATIONS */}
+          <View style={[styles.sectionHeaderRow, { marginTop: 24, marginBottom: 12 }]}>
+            <View style={[styles.settingIconWrap, { backgroundColor: "rgba(239, 68, 68, 0.15)" }]}>
+              <Ionicons name="warning-outline" size={20} color="#EF4444" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.sectionHeading, { color: "#EF4444" }]}>Danger Zone</Text>
+              <Text style={styles.sectionDesc}>Irreversible actions for system management.</Text>
+            </View>
+          </View>
+
+          <View style={styles.settingRow}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingTitle}>Wipe All Notifications</Text>
+              <Text style={styles.settingSub}>Delete all notifications from the database globally (for all users).</Text>
+            </View>
+            <Pressable
+              style={{ backgroundColor: "rgba(239, 68, 68, 0.15)", paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: "rgba(239, 68, 68, 0.5)" }}
+              onPress={() => {
+                Alert.alert("Are you sure?", "This will permanently delete all global and personal notifications for all users. This cannot be undone.", [
+                  { text: "Cancel", style: "cancel" },
+                  { text: "Wipe Data", style: "destructive", onPress: async () => {
+                    try {
+                      await adminWipeAllNotifications();
+                      Alert.alert("Success", "All notifications wiped.");
+                    } catch (e) {
+                      Alert.alert("Error", "Failed to wipe notifications.");
+                    }
+                  }}
+                ]);
+              }}
+            >
+              <Text style={{ color: "#EF4444", fontWeight: "700", fontSize: 12 }}>Wipe Data</Text>
+            </Pressable>
+          </View>
+
           {/* SOCIAL & WALLET FEATURE TOGGLES */}
-          <View style={styles.sectionHeaderRow}>
+          <View style={[styles.sectionHeaderRow, { marginTop: 24 }]}>
             <View style={[styles.settingIconWrap, { backgroundColor: "rgba(16, 185, 129, 0.15)" }]}>
               <Ionicons name="gift-outline" size={20} color="#10B981" />
             </View>
@@ -223,6 +261,25 @@ export default function AdminSettings() {
               <Text style={styles.sectionHeading}>Social & Wallet Features</Text>
               <Text style={styles.sectionDesc}>Enable or disable user wallet gifting and friends chat across the entire platform in real-time.</Text>
             </View>
+          </View>
+
+          {/* GIVEAWAY COMBOS */}
+          <View style={[styles.settingRow, { marginTop: 8 }]}>
+            <View style={styles.settingInfo}>
+              <View style={[styles.settingIconWrap, { backgroundColor: "rgba(236, 72, 153, 0.15)" }]}>
+                <Ionicons name="rocket-outline" size={18} color="#EC4899" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.settingTitle}>Giveaways & Combos</Text>
+                <Text style={styles.settingSub}>Launch 3-course bundle popup giveaways to all users.</Text>
+              </View>
+            </View>
+            <Pressable
+              style={{ backgroundColor: "#EC4899", paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8 }}
+              onPress={() => router.push("/admin/combos")}
+            >
+              <Text style={{ color: "#FFF", fontWeight: "700", fontSize: 12 }}>Manage</Text>
+            </Pressable>
           </View>
 
           {/* GIFT A FRIEND TOGGLE */}
@@ -473,6 +530,69 @@ export default function AdminSettings() {
             <Text style={styles.resetBtnText}>Reset to Default (Standard 240 × 130)</Text>
           </Pressable>
 
+          {/* DASHBOARD BANNERS */}
+          <View style={[styles.sectionHeaderRow, { marginTop: 24 }]}>
+            <View style={[styles.settingIconWrap, { backgroundColor: "rgba(236, 72, 153, 0.15)" }]}>
+              <Ionicons name="images-outline" size={20} color="#EC4899" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.sectionHeading}>Dashboard Banners</Text>
+              <Text style={styles.sectionDesc}>Customize the promotional banners that appear at the top of the home screen.</Text>
+            </View>
+          </View>
+          
+          {(boxConfig.banners || defaultCourseBoxConfig.banners || []).map((b, i) => (
+            <View key={b.id || i} style={styles.bannerEditCard}>
+              <Text style={[styles.subHeading, { marginBottom: 8 }]}>Banner {i + 1}</Text>
+              <TextInput 
+                style={styles.bannerInput} 
+                placeholder="Title" 
+                placeholderTextColor="#64748B" 
+                value={b.title} 
+                onChangeText={(text) => {
+                  const newBanners = [...(boxConfig.banners || defaultCourseBoxConfig.banners || [])];
+                  newBanners[i] = { ...newBanners[i], title: text };
+                  setBoxConfig({ ...boxConfig, banners: newBanners });
+                }} 
+              />
+              <TextInput 
+                style={styles.bannerInput} 
+                placeholder="Subtitle" 
+                placeholderTextColor="#64748B" 
+                value={b.sub} 
+                onChangeText={(text) => {
+                  const newBanners = [...(boxConfig.banners || defaultCourseBoxConfig.banners || [])];
+                  newBanners[i] = { ...newBanners[i], sub: text };
+                  setBoxConfig({ ...boxConfig, banners: newBanners });
+                }} 
+              />
+              <TextInput 
+                style={styles.bannerInput} 
+                placeholder="Image URL (e.g. imgur, catbox)" 
+                placeholderTextColor="#64748B" 
+                value={b.imgUrl} 
+                onChangeText={(text) => {
+                  const newBanners = [...(boxConfig.banners || defaultCourseBoxConfig.banners || [])];
+                  newBanners[i] = { ...newBanners[i], imgUrl: text };
+                  setBoxConfig({ ...boxConfig, banners: newBanners });
+                }} 
+              />
+            </View>
+          ))}
+          <Pressable style={styles.saveBannersBtn} onPress={async () => {
+             setSaving(true);
+             try {
+               await saveCourseBoxConfig(boxConfig);
+               showSavedIndicator("Banners updated!");
+             } catch(e) {
+               Alert.alert("Error", "Failed to save banners.");
+             } finally {
+               setSaving(false);
+             }
+          }}>
+            <Text style={styles.saveBannersBtnText}>Save Banners to Live App</Text>
+          </Pressable>
+
           <View style={styles.divider} />
           
           {/* iOS Live Navbar Template */}
@@ -594,5 +714,11 @@ const styles = StyleSheet.create({
   radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: "#64748B", alignItems: "center", justifyContent: "center" },
   radioActive: { width: 10, height: 10, borderRadius: 5, backgroundColor: "#A855F7" },
   templateText: { color: "#F8FAFC", fontSize: 15, fontWeight: "600" },
+
+  // Banners
+  bannerEditCard: { backgroundColor: "#131C31", padding: 16, borderRadius: 12, borderWidth: 1, borderColor: "#1E293B", marginBottom: 12 },
+  bannerInput: { backgroundColor: "#0F172A", color: "#F8FAFC", padding: 12, borderRadius: 10, marginBottom: 8, borderWidth: 1, borderColor: "#1E293B" },
+  saveBannersBtn: { backgroundColor: "#EC4899", paddingVertical: 14, borderRadius: 12, alignItems: "center", marginTop: 8 },
+  saveBannersBtnText: { color: "#FFF", fontSize: 14, fontWeight: "700" },
 });
 

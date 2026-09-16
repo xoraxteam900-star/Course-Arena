@@ -111,9 +111,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const ref = doc(db, "users", firebaseUser.uid);
     const unsub = onSnapshot(
       ref,
-      (snap) => {
+      async (snap) => {
         if (snap.exists()) {
           setProfile({ uid: snap.id, ...(snap.data() as any) });
+        } else {
+          // If the profile DOES NOT EXIST, auto-create it (e.g., imported user)
+          const info = { 
+            fullName: firebaseUser.displayName || "New user", 
+            username: firebaseUser.email?.split("@")[0] || `user_${firebaseUser.uid.slice(0, 6)}`, 
+            email: firebaseUser.email || "" 
+          };
+          try {
+            await setDoc(ref, {
+              fullName: info.fullName,
+              username: info.username,
+              email: info.email,
+              role: "user",
+              balance: 0,
+              signupBonusGiven: false,
+              emailVerified: firebaseUser.emailVerified || false,
+              onboardingCompleted: false,
+              status: "active",
+              policyAccepted: true,
+              policyAcceptedAt: serverTimestamp(),
+              createdAt: serverTimestamp(),
+            });
+          } catch (e) {
+            console.error("Auto-create profile error:", e);
+          }
         }
         setLoading(false);
       },

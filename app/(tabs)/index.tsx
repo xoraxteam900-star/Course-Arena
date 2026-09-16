@@ -16,11 +16,11 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
-import { coursesGroupedByCategory, listCategories, mySavedCourses, toggleSaveCourse } from "@/services/courses";
+import { coursesGroupedByCategory, listCategories, mySavedCourses, toggleSaveCourse, myPurchases } from "@/services/courses";
 import { listNotificationsFor, subscribeNotifications } from "@/services/notifications";
 import { Category, Course } from "@/types";
 import { collection, query, orderBy, limit, getDocs, where, onSnapshot } from "firebase/firestore";
@@ -43,8 +43,113 @@ import {
   PlatformFeatures,
 } from "@/services/platformFeatures";
 import { useNavBarVisibility } from "@/contexts/NavBarVisibilityContext";
-
+import { getActiveCombo, ComboGiveaway } from "@/services/combos";
+import GiveawayPopup from "@/components/GiveawayPopup";
+import GiveawaySuccessAnimation from "@/components/GiveawaySuccessAnimation";
 type Group = { category: Category; courses: Course[] };
+
+import { Dimensions } from "react-native";
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+
+const CourseBoxCard = ({ item, savedIds, handleToggleSave, colors, boxConfig, cardWidthOverride }: any) => {
+  const cardW = cardWidthOverride || (boxConfig?.cardWidth ?? 240);
+  const imgH = boxConfig?.imageHeight ?? 130;
+  const radius = boxConfig?.borderRadius ?? 16;
+  const imgRadius = Math.max(radius - 4, 6);
+  const titleSize = boxConfig?.titleFontSize ?? 14;
+  const priceSize = boxConfig?.priceFontSize ?? 13;
+
+  return (
+    <Pressable 
+      style={[
+        styles.card, 
+        { 
+          backgroundColor: colors.card,
+          width: cardW,
+          borderRadius: radius,
+        }
+      ]} 
+      onPress={() => router.push({
+        pathname: `/course/${item.id}`,
+        params: {
+          initialTitle: item.title,
+          initialImage: item.image || "",
+          initialPrice: String(item.price ?? 0),
+          initialCategoryId: item.categoryId || "",
+          initialSubtitle: (item as any).subtitle || "",
+        }
+      })}
+    >
+      <View style={styles.cardImageContainer}>
+        <CourseThumbnail
+          uri={item.image}
+          title={item.title}
+          style={[styles.cardImage, { height: imgH, borderRadius: imgRadius }]}
+          containerStyle={{ height: imgH, borderRadius: imgRadius }}
+          resizeMode="cover"
+        />
+        {item.isPinned && (
+          <View style={[styles.popularBadge, { backgroundColor: "rgba(251, 191, 36, 0.95)", borderColor: "#F59E0B" }]}>
+            <Text style={{ fontSize: 11 }}>📌</Text>
+            <Text style={[styles.popularBadgeText, { color: "#0F172A", fontWeight: "800" }]}>Pinned</Text>
+          </View>
+        )}
+      </View>
+      <Text 
+        style={[
+          styles.cardTitle, 
+          { 
+            color: colors.text, 
+            fontSize: titleSize, 
+            minHeight: titleSize <= 12 ? 28 : 38,
+            lineHeight: titleSize <= 12 ? 15 : 19,
+          } 
+        ]} 
+        numberOfLines={2}
+      >
+        {item.title}
+      </Text>
+      <View style={styles.cardFooter}>
+        <View>
+          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 2 }}>
+            <Ionicons name="star" size={12} color="#FBBF24" />
+            <Text style={[styles.ratingText, { color: colors.text }]}>
+              {" "}{(item.avgRating ?? 0) > 0 ? item.avgRating.toFixed(1) : "0.0"}{" "}
+              <Text style={{ color: colors.textDim }}>({item.ratingCount ?? 0})</Text>
+            </Text>
+          </View>
+          <Text 
+            style={[styles.priceText, { color: colors.text, fontSize: priceSize }]}
+          >
+            GH₵{(item.price ?? 0).toFixed(2)}
+          </Text>
+        </View>
+        <Pressable onPress={(e) => { e.stopPropagation(); handleToggleSave(item.id); }} style={{ padding: 4 }}>
+          <Ionicons name={savedIds.has(item.id) ? "bookmark" : "bookmark-outline"} size={20} color={savedIds.has(item.id) ? colors.primary : colors.text} />
+        </Pressable>
+      </View>
+    </Pressable>
+  );
+};
+
+const CategoryCourseGrid = ({ courses, savedIds, handleToggleSave, colors, boxConfig }: any) => {
+  const gridCardWidth = (SCREEN_WIDTH - 40 - 16) / 2;
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', paddingHorizontal: 20, rowGap: 16 }}>
+      {courses.map((item: any) => (
+        <CourseBoxCard 
+          key={item.id} 
+          item={item} 
+          savedIds={savedIds} 
+          handleToggleSave={handleToggleSave} 
+          colors={colors} 
+          boxConfig={boxConfig} 
+          cardWidthOverride={gridCardWidth} 
+        />
+      ))}
+    </View>
+  );
+};
 
 const CategoryCourseSlider = ({ courses, savedIds, handleToggleSave, colors, index = 0, boxConfig }: any) => {
   const listRef = useRef<FlatList>(null);
@@ -67,7 +172,7 @@ const CategoryCourseSlider = ({ courses, savedIds, handleToggleSave, colors, ind
           return nextIndex;
         });
       }, 4000);
-    }, index * 1500); // 1.5s delay between each category's movement
+    }, index * 1500);
 
     return () => {
       clearTimeout(timeout);
@@ -86,98 +191,22 @@ const CategoryCourseSlider = ({ courses, savedIds, handleToggleSave, colors, ind
       windowSize={5}
       keyExtractor={(c: any, idx: number) => c.id ? `card-${c.id}` : `course-${idx}`}
       contentContainerStyle={{ paddingHorizontal: 20, gap: 16 }}
+      extraData={boxConfig}
       onScrollBeginDrag={() => setIsAutoPlay(false)}
       onScrollToIndexFailed={(info) => {
         setTimeout(() => {
           listRef.current?.scrollToIndex({ index: info.index, animated: true, viewPosition: 0.5 });
         }, 100);
       }}
-      renderItem={({ item, index: itemIdx }) => {
-        const cardW = boxConfig?.cardWidth ?? 240;
-        const imgH = boxConfig?.imageHeight ?? 130;
-        const radius = boxConfig?.borderRadius ?? 16;
-        const imgRadius = Math.max(radius - 4, 6);
-        const titleSize = boxConfig?.titleFontSize ?? 14;
-        const priceSize = boxConfig?.priceFontSize ?? 13;
-
-        const content = (
-          <>
-            <View style={styles.cardImageContainer}>
-              <CourseThumbnail
-                uri={item.image}
-                title={item.title}
-                style={[styles.cardImage, { height: imgH, borderRadius: imgRadius }]}
-                containerStyle={{ height: imgH, borderRadius: imgRadius }}
-                resizeMode="cover"
-              />
-              {item.isPinned && (
-                <View style={[styles.popularBadge, { backgroundColor: "rgba(251, 191, 36, 0.95)", borderColor: "#F59E0B" }]}>
-                  <Text style={{ fontSize: 11 }}>📌</Text>
-                  <Text style={[styles.popularBadgeText, { color: "#0F172A", fontWeight: "800" }]}>Pinned</Text>
-                </View>
-              )}
-            </View>
-            <Text 
-              style={[
-                styles.cardTitle, 
-                { 
-                  color: colors.text, 
-                  fontSize: titleSize, 
-                  minHeight: titleSize <= 12 ? 28 : 38,
-                  lineHeight: titleSize <= 12 ? 15 : 19,
-                } 
-              ]} 
-              numberOfLines={2}
-            >
-              {item.title}
-            </Text>
-            <View style={styles.cardFooter}>
-              <View>
-                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 2 }}>
-                  <Ionicons name="star" size={12} color="#FBBF24" />
-                  <Text style={[styles.ratingText, { color: colors.text }]}>
-                    {" "}{(item.avgRating ?? 0) > 0 ? item.avgRating.toFixed(1) : "0.0"}{" "}
-                    <Text style={{ color: colors.textDim }}>({item.ratingCount ?? 0})</Text>
-                  </Text>
-                </View>
-                <Text 
-                  style={[styles.priceText, { color: colors.text, fontSize: priceSize }]}
-                >
-                  GH₵{(item.price ?? 0).toFixed(2)}
-                </Text>
-              </View>
-              <Pressable onPress={(e) => { e.stopPropagation(); handleToggleSave(item.id); }} style={{ padding: 4 }}>
-                <Ionicons name={savedIds.has(item.id) ? "bookmark" : "bookmark-outline"} size={20} color={savedIds.has(item.id) ? colors.primary : colors.text} />
-              </Pressable>
-            </View>
-          </>
-        );
-
-        return (
-          <Pressable 
-            style={[
-              styles.card, 
-              { 
-                backgroundColor: colors.card,
-                width: cardW,
-                borderRadius: radius,
-              }
-            ]} 
-            onPress={() => router.push({
-              pathname: `/course/${item.id}`,
-              params: {
-                initialTitle: item.title,
-                initialImage: item.image || "",
-                initialPrice: String(item.price ?? 0),
-                initialCategoryId: item.categoryId || "",
-                initialSubtitle: (item as any).subtitle || "",
-              }
-            })}
-          >
-            {content}
-          </Pressable>
-        );
-      }}
+      renderItem={({ item }) => (
+        <CourseBoxCard 
+          item={item} 
+          savedIds={savedIds} 
+          handleToggleSave={handleToggleSave} 
+          colors={colors} 
+          boxConfig={boxConfig} 
+        />
+      )}
     />
   );
 };
@@ -221,6 +250,37 @@ export default function Dashboard() {
   const broadcastAnim = useRef(new Animated.Value(0.5)).current;
   const [unreadCount, setUnreadCount] = useState(0);
 
+  // Giveaway Combo state
+  const [combo, setCombo] = useState<ComboGiveaway | null>(null);
+  const [showComboPopup, setShowComboPopup] = useState(false);
+  const [showSuccessAnim, setShowSuccessAnim] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!profile) return;
+      const checkCombo = async () => {
+        try {
+          const active = await getActiveCombo();
+          if (active) {
+            const purchasedFlag = await AsyncStorage.getItem(`@coursearena_combo_purchased_${active.id}`);
+            if (purchasedFlag === "true") return; // Never show if purchased flag exists
+
+            const userPurchases = await myPurchases(profile.uid);
+            const purchasedIds = userPurchases.map((p: any) => p.courseId);
+            const missing = active.courseIds.filter(id => !purchasedIds.includes(id));
+            if (missing.length > 0) {
+              setCombo(active);
+              setShowComboPopup(true);
+            }
+          }
+        } catch (e) {
+          console.warn("Failed to load giveaway combo", e);
+        }
+      };
+      checkCombo();
+    }, [profile])
+  );
+
   const [activePoll, setActivePoll] = useState<Poll | null>(null);
 
   useEffect(() => {
@@ -230,30 +290,16 @@ export default function Dashboard() {
     return () => unsub();
   }, []);
 
-  const banners = [
-    {
-      title: "Welcome back!",
-      sub: "Pick up right where you left off.",
-      img: require("../../assets/images/banner1.png"),
-    },
-    {
-      title: "Top Picks",
-      sub: "Explore courses recommended for you.",
-      img: require("../../assets/images/banner2.png"),
-    },
-    {
-      title: "New Releases",
-      sub: "Stay ahead with the latest content.",
-      img: require("../../assets/images/banner3.png"),
-    },
-  ];
+
+  const displayBanners = boxConfig?.banners || defaultCourseBoxConfig.banners || [];
 
   useEffect(() => {
+    if (displayBanners.length === 0) return;
     const int = setInterval(() => {
-      setActiveBanner((prev) => (prev + 1) % banners.length);
+      setActiveBanner((prev) => (prev + 1) % displayBanners.length);
     }, 3000);
     return () => clearInterval(int);
-  }, []);
+  }, [displayBanners.length]);
 
   const load = useCallback(async () => {
     const c = await listCategories();
@@ -316,9 +362,11 @@ export default function Dashboard() {
     return () => unsub();
   }, [profile?.uid]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
 
   useEffect(() => {
     if (categories.length === 0) return;
@@ -599,26 +647,28 @@ export default function Dashboard() {
       )}
 
       {/* Promotional Banner Slider */}
-      <View style={styles.bannerContainer}>
-        <View style={styles.bannerContent}>
-          <Text style={styles.bannerTitle}>{banners[activeBanner].title}</Text>
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingRight: 40 }}>
-            <Text style={styles.bannerSub}>{banners[activeBanner].sub}</Text>
-            <Pressable style={styles.exploreBtn} onPress={() => router.push("/(tabs)/courses")}>
-              <Text style={styles.exploreBtnText}>Explore</Text>
-              <Ionicons name="arrow-forward" size={12} color="#0F172A" />
-            </Pressable>
+      {displayBanners.length > 0 && activeBanner < displayBanners.length && (
+        <View style={styles.bannerContainer}>
+          <View style={styles.bannerContent}>
+            <Text style={styles.bannerTitle}>{displayBanners[activeBanner].title}</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingRight: 40 }}>
+              <Text style={styles.bannerSub}>{displayBanners[activeBanner].sub}</Text>
+              <Pressable style={styles.exploreBtn} onPress={() => router.push("/(tabs)/courses")}>
+                <Text style={styles.exploreBtnText}>Explore</Text>
+                <Ionicons name="arrow-forward" size={12} color="#0F172A" />
+              </Pressable>
+            </View>
+          </View>
+          
+          <CourseThumbnail uri={displayBanners[activeBanner].imgUrl} style={styles.bannerGraphic} containerStyle={styles.bannerGraphic} resizeMode="contain" />
+          
+          <View style={styles.bannerDots}>
+            {displayBanners.map((_, i) => (
+              <View key={i} style={[styles.dot, activeBanner === i && styles.dotActive]} />
+            ))}
           </View>
         </View>
-        
-        <Image source={banners[activeBanner].img} style={styles.bannerGraphic} resizeMode="contain" />
-        
-        <View style={styles.bannerDots}>
-          {banners.map((_, i) => (
-            <View key={i} style={[styles.dot, activeBanner === i && styles.dotActive]} />
-          ))}
-        </View>
-      </View>
+      )}
 
       {/* Active Community Poll with countdown and live voting */}
       {activePoll && (
@@ -665,14 +715,24 @@ export default function Dashboard() {
             </Pressable>
           </View>
           
-          <CategoryCourseSlider
-            courses={courses}
-            savedIds={savedIds}
-            handleToggleSave={handleToggleSave}
-            colors={colors}
-            index={idx}
-            boxConfig={boxConfig}
-          />
+          {activeCategory ? (
+            <CategoryCourseGrid
+              courses={courses}
+              savedIds={savedIds}
+              handleToggleSave={handleToggleSave}
+              colors={colors}
+              boxConfig={boxConfig}
+            />
+          ) : (
+            <CategoryCourseSlider
+              courses={courses}
+              savedIds={savedIds}
+              handleToggleSave={handleToggleSave}
+              colors={colors}
+              index={idx}
+              boxConfig={boxConfig}
+            />
+          )}
         </View>
       ))}
 
@@ -682,6 +742,22 @@ export default function Dashboard() {
       <View style={{ height: 120 }} />
       </ScrollView>
       </FadeInView>
+      {/* GIVEAWAY POPUP & ANIMATION */}
+      {showComboPopup && combo && (
+        <GiveawayPopup
+          combo={combo}
+          onClose={() => setShowComboPopup(false)}
+          onSuccess={() => {
+            setShowComboPopup(false);
+            setShowSuccessAnim(true);
+          }}
+        />
+      )}
+      
+      {showSuccessAnim && (
+        <GiveawaySuccessAnimation onComplete={() => setShowSuccessAnim(false)} />
+      )}
+
     </SafeAreaView>
   );
 }

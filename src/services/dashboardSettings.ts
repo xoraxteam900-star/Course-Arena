@@ -4,6 +4,13 @@ import { db } from "@/firebase/config";
 
 export type CourseBoxPreset = "compact" | "standard" | "large" | "hero" | "custom";
 
+export interface BannerConfig {
+  id: string;
+  title: string;
+  sub: string;
+  imgUrl: string;
+}
+
 export interface CourseBoxConfig {
   preset: CourseBoxPreset;
   cardWidth: number;      // Width in pixels (140 to 320)
@@ -11,6 +18,7 @@ export interface CourseBoxConfig {
   borderRadius: number;   // Corner radius (6 to 28)
   titleFontSize: number;  // Title font size (11 to 18)
   priceFontSize: number;  // Price font size (11 to 18)
+  banners?: BannerConfig[];
   lastUpdated?: any;
 }
 
@@ -51,6 +59,26 @@ export const COURSE_BOX_PRESETS: Record<Exclude<CourseBoxPreset, "custom">, Omit
 
 export const defaultCourseBoxConfig: CourseBoxConfig = {
   ...COURSE_BOX_PRESETS.standard,
+  banners: [
+    {
+      id: "b1",
+      title: "Welcome back!",
+      sub: "Pick up right where you left off.",
+      imgUrl: "https://i.imgur.com/Qj4Zz2h.png",
+    },
+    {
+      id: "b2",
+      title: "Top Picks",
+      sub: "Explore courses recommended for you.",
+      imgUrl: "https://i.imgur.com/Qj4Zz2h.png",
+    },
+    {
+      id: "b3",
+      title: "New Releases",
+      sub: "Stay ahead with the latest content.",
+      imgUrl: "https://i.imgur.com/Qj4Zz2h.png",
+    },
+  ],
   lastUpdated: new Date(),
 };
 

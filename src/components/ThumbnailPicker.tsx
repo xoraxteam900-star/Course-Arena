@@ -6,6 +6,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "@/firebase/config";
 import { Ionicons } from "@expo/vector-icons";
 import { normalizeImageUrl } from "@/utils/imageUrl";
+import { CourseThumbnail } from "./CourseThumbnail";
 
 type Mode = "url" | "firebase" | "infinityfree";
 
@@ -33,8 +34,7 @@ export function ThumbnailPicker({ uid, value, onChange, existingPreview }: Props
     setLocalPreview(null);
     setLoadError(false);
     setLoadSuccess(false);
-    const normalized = normalizeImageUrl(text);
-    onChange(normalized);
+    onChange(text);
   };
 
   async function pickAndUpload(target: "firebase" | "infinityfree") {
@@ -83,37 +83,23 @@ export function ThumbnailPicker({ uid, value, onChange, existingPreview }: Props
             <ActivityIndicator color="#6366F1" size="large" />
             <Text style={styles.previewHint}>Uploading image...</Text>
           </View>
-        ) : previewUri && !loadError ? (
+        ) : previewUri ? (
           <View style={{ width: "100%", height: "100%" }}>
-            <Image
-              source={{ uri: previewUri }}
+            <CourseThumbnail
+              uri={previewUri}
               style={styles.previewImage}
               resizeMode="cover"
-              onLoad={() => {
-                setLoadError(false);
-                setLoadSuccess(true);
-              }}
-              onError={() => {
-                setLoadError(true);
-                setLoadSuccess(false);
-              }}
             />
-            {loadSuccess && (
-              <View style={styles.statusBadge}>
-                <Ionicons name="checkmark-circle" size={14} color="#10B981" />
-                <Text style={styles.statusBadgeText}>Image Loaded</Text>
-              </View>
-            )}
           </View>
         ) : (
           <View style={{ alignItems: "center", padding: 12 }}>
             <Ionicons
-              name={loadError ? "alert-circle-outline" : "image-outline"}
+              name={"image-outline"}
               size={32}
-              color={loadError ? "#EF4444" : "#475569"}
+              color={"#475569"}
             />
-            <Text style={[styles.previewHint, loadError && { color: "#EF4444" }]}>
-              {loadError ? "Image failed to load. Check URL or permission." : "No thumbnail preview"}
+            <Text style={styles.previewHint}>
+              No thumbnail preview
             </Text>
           </View>
         )}

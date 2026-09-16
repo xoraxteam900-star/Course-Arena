@@ -209,6 +209,24 @@ export async function clearAllNotifications(
 }
 
 /**
+ * Admin action to wipe ALL notifications and reads from the entire platform
+ */
+export async function adminWipeAllNotifications(): Promise<void> {
+  try {
+    const snaps = await getDocs(collection(db, "notifications"));
+    const promises = snaps.docs.map((d) => deleteDoc(d.ref));
+    await Promise.all(promises);
+
+    const readSnaps = await getDocs(collection(db, "notification_reads"));
+    const readPromises = readSnaps.docs.map((d) => deleteDoc(d.ref));
+    await Promise.all(readPromises);
+  } catch (err) {
+    console.error("Failed to wipe all notifications:", err);
+    throw err;
+  }
+}
+
+/**
  * Helper to dispatch a notification (used by admin or system actions)
  */
 export async function sendNotification(data: {

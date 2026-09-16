@@ -62,6 +62,26 @@ export default function CourseDetail() {
   const { profile } = useAuth();
   const { colors, isDark } = useTheme();
 
+  if (Platform.OS === "web") {
+    return (
+      <View style={{ flex: 1, backgroundColor: "#080B14", justifyContent: "center", alignItems: "center", padding: 20 }}>
+        <Ionicons name="phone-portrait-outline" size={64} color="#5B4DFF" style={{ marginBottom: 20 }} />
+        <Text style={{ color: "#FFFFFF", fontSize: 24, fontWeight: "bold", textAlign: "center", marginBottom: 12 }}>Open in App</Text>
+        <Text style={{ color: "#94A3B8", fontSize: 16, textAlign: "center", marginBottom: 30, maxWidth: 300 }}>
+          CourseArena is best experienced in our mobile app. Please open this link on your phone to continue.
+        </Text>
+        <Pressable 
+          style={{ backgroundColor: "#5B4DFF", paddingVertical: 14, paddingHorizontal: 32, borderRadius: 12 }}
+          onPress={() => {
+            window.location.href = `coursearena://course/${id}`;
+          }}
+        >
+          <Text style={{ color: "#FFFFFF", fontSize: 16, fontWeight: "bold" }}>Open CourseArena App</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   const [course, setCourse] = useState<Course | null>(() => {
     if (!id) return null;
     if (initialTitle) {
@@ -186,10 +206,17 @@ export default function CourseDetail() {
     const newLiked = !liked;
     setLiked(newLiked);
     setCourse((prev) => (prev ? { ...prev, likeCount: Math.max(0, (prev.likeCount || 0) + (newLiked ? 1 : -1)) } : prev));
-    const nowLiked = await toggleLike(course.id, profile.uid);
-    if (nowLiked !== newLiked) {
-      setLiked(nowLiked);
-      setCourse((prev) => (prev ? { ...prev, likeCount: Math.max(0, (prev.likeCount || 0) + (nowLiked ? 1 : -1)) } : prev));
+    try {
+      const nowLiked = await toggleLike(course.id, profile.uid);
+      if (nowLiked !== newLiked) {
+        setLiked(nowLiked);
+        setCourse((prev) => (prev ? { ...prev, likeCount: Math.max(0, (prev.likeCount || 0) + (nowLiked ? 1 : -1)) } : prev));
+      }
+    } catch (e: any) {
+      console.error("onLike error", e);
+      Alert.alert("Like Failed", e.message || "An error occurred.");
+      setLiked(!newLiked); // Revert on failure
+      setCourse((prev) => (prev ? { ...prev, likeCount: Math.max(0, (prev.likeCount || 0) + (!newLiked ? 1 : -1)) } : prev));
     }
   }
 
@@ -198,19 +225,27 @@ export default function CourseDetail() {
     const newSaved = !saved;
     setSaved(newSaved);
     setCourse((prev) => (prev ? { ...prev, saveCount: Math.max(0, (prev.saveCount || 0) + (newSaved ? 1 : -1)) } : prev));
-    const nowSaved = await toggleSave(course.id, profile.uid);
-    if (nowSaved !== newSaved) {
-      setSaved(nowSaved);
-      setCourse((prev) => (prev ? { ...prev, saveCount: Math.max(0, (prev.saveCount || 0) + (nowSaved ? 1 : -1)) } : prev));
+    try {
+      const nowSaved = await toggleSave(course.id, profile.uid);
+      if (nowSaved !== newSaved) {
+        setSaved(nowSaved);
+        setCourse((prev) => (prev ? { ...prev, saveCount: Math.max(0, (prev.saveCount || 0) + (nowSaved ? 1 : -1)) } : prev));
+      }
+    } catch (e: any) {
+      console.error("onSave error", e);
+      Alert.alert("Save Failed", e.message || "An error occurred.");
+      setSaved(!newSaved); // Revert on failure
+      setCourse((prev) => (prev ? { ...prev, saveCount: Math.max(0, (prev.saveCount || 0) + (!newSaved ? 1 : -1)) } : prev));
     }
   }
 
   async function handleShare() {
     if (!course) return;
     try {
+      const domain = process.env.EXPO_PUBLIC_WEBSITE_URL || "https://coursearena.app";
       await Share.share({
         title: course.title,
-        message: `Check out "${course.title}" on CourseArena!\nhttps://coursearena.app/course/${course.id}`,
+        message: `Check out "${course.title}" on CourseArena!\n${domain}/course/${course.id}`,
       });
     } catch (e) {
       console.error("Share error:", e);
@@ -219,7 +254,8 @@ export default function CourseDetail() {
 
   async function copyLink() {
     if (!course) return;
-    await Clipboard.setStringAsync(`https://coursearena.app/course/${course.id}`);
+    const domain = process.env.EXPO_PUBLIC_WEBSITE_URL || "https://coursearena.app";
+    await Clipboard.setStringAsync(`${domain}/course/${course.id}`);
     setShowOptionsMenu(false);
     Alert.alert("Link Copied", "Course link copied to clipboard!");
   }

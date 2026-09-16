@@ -16,6 +16,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
 import { sendRegistrationOtp, verifyOtpCode } from "@/services/otpService";
 import { PolicyModal } from "@/components/PolicyModal";
+import { collection, query, where, getDocs, limit } from "firebase/firestore";
+import { db } from "@/firebase/config";
 
 const { width } = Dimensions.get("window");
 
@@ -30,6 +32,7 @@ export default function Register() {
 
   const [step, setStep] = useState<"form" | "verify_otp">("form");
   const [fullName, setFullName] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
@@ -53,13 +56,17 @@ export default function Register() {
   // Step 1: Validate inputs and request email verification OTP
   async function handleRequestOtp() {
     const trimmedName = fullName.trim();
+    const trimmedUsername = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
     const trimmedEmail = email.trim().toLowerCase();
 
-    if (!trimmedName || !trimmedEmail || !password) {
+    if (!trimmedName || !trimmedUsername || !trimmedEmail || !password) {
       return Alert.alert("Missing info", "Please fill in every field.");
     }
     if (trimmedName.length < 2) {
       return Alert.alert("Invalid name", "Please enter your full name.");
+    }
+    if (trimmedUsername.length < 3) {
+      return Alert.alert("Invalid username", "Username must be at least 3 characters.");
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(trimmedEmail)) {
@@ -81,6 +88,14 @@ export default function Register() {
 
     setBusy(true);
     try {
+      // Check if username is already taken
+      const q = query(collection(db, "users"), where("username", "==", trimmedUsername), limit(1));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        setBusy(false);
+        return Alert.alert("Username Taken", "This username is already taken. Please choose another one.");
+      }
+
       await sendRegistrationOtp(trimmedEmail);
       setStep("verify_otp");
       setResendCountdown(30);
@@ -123,11 +138,9 @@ export default function Register() {
       await verifyOtpCode(trimmedEmail, trimmedOtp);
 
       // 2. Verified real email! Proceed with Firebase user and profile creation
-      const generatedUsername =
-        trimmedEmail.split("@")[0].replace(/[^a-zA-Z0-9]/g, "") +
-        Math.floor(Math.random() * 1000);
+      const trimmedUsername = username.trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
 
-      await register(fullName.trim(), generatedUsername, trimmedEmail, password);
+      await register(fullName.trim(), trimmedUsername, trimmedEmail, password);
 
       Alert.alert(
         "Email Verified",
@@ -202,6 +215,18 @@ export default function Register() {
                   placeholderTextColor="#9CA3AF"
                   value={fullName}
                   onChangeText={setFullName}
+                />
+              </View>
+
+              <View style={styles.inputContainer}>
+                <Ionicons name="at-outline" size={20} color="#9CA3AF" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Username"
+                  placeholderTextColor="#9CA3AF"
+                  autoCapitalize="none"
+                  value={username}
+                  onChangeText={setUsername}
                 />
               </View>
 

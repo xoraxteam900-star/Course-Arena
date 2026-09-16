@@ -14,7 +14,7 @@ import {
   ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -92,9 +92,11 @@ export default function MyCourses() {
     }
   }, [profile]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
 
   // Fast check if course is in saved list
   const savedIds = useMemo(() => new Set(saved.map((s) => s.id)), [saved]);

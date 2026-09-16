@@ -4,7 +4,7 @@ import * as FirebaseAuth from "firebase/auth";
 // @ts-ignore
 import * as AtFirebaseAuth from "@firebase/auth";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getFirestore, setLogLevel } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, setLogLevel } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { Platform } from "react-native";
 
@@ -55,7 +55,17 @@ export const auth =
         }
       })();
 
-export const db = getFirestore(app);
+export const db = (() => {
+  try {
+    return initializeFirestore(app, {
+      localCache: persistentLocalCache(),
+    });
+  } catch (e) {
+    // Fallback if already initialized (fast refresh)
+    const { getFirestore } = require("firebase/firestore");
+    return getFirestore(app);
+  }
+})();
 try {
   setLogLevel("silent");
 } catch {}
