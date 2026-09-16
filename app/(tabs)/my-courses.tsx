@@ -528,7 +528,7 @@ export default function MyCourses() {
                 </Text>
                 <Pressable
                   style={[styles.exploreBtn, { backgroundColor: purplePrimary }]}
-                  onPress={() => router.push("/(tabs)/")}
+                  onPress={() => router.push("/(tabs)")}
                 >
                   <Ionicons name="compass-outline" size={16} color="#FFFFFF" />
                   <Text style={styles.exploreBtnText}>Explore Marketplace</Text>

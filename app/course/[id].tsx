@@ -733,7 +733,7 @@ export default function CourseDetail() {
               <Ionicons name="play" size={18} color="#FFF" />
               <Text style={styles.modalBtnOpenText}>Open Course ➔</Text>
             </Pressable>
-            <Pressable style={[styles.modalBtnBrowse, { borderColor: borderCol }]} onPress={() => { setShowSuccess(false); router.push("/(tabs)/"); }}>
+            <Pressable style={[styles.modalBtnBrowse, { borderColor: borderCol }]} onPress={() => { setShowSuccess(false); router.push("/(tabs)"); }}>
               <Text style={[styles.modalBtnBrowseText, { color: textColor }]}>Continue Browsing</Text>
             </Pressable>
           </View>
