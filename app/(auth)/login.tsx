@@ -155,7 +155,7 @@ export default function Login() {
                 <Ionicons name="mail-outline" size={20} color="#9CA3AF" style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="Email or username"
+                  placeholder="Email address"
                   placeholderTextColor="#9CA3AF"
                   autoCapitalize="none"
                   keyboardType="email-address"
